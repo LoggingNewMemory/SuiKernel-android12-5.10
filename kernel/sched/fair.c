@@ -7035,6 +7035,9 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 	int cpu = smp_processor_id();
 	int new_cpu = prev_cpu;
 	int want_affine = 0;
+	/* [MOD] Disable sync wakeups for heavy tasks to prevent stacking on busy cores */
+	if (task_util(p) > 700)
+		wake_flags &= ~WF_SYNC;
 	int sync = (wake_flags & WF_SYNC) && !(current->flags & PF_EXITING);
 	int target_cpu = -1;
 
@@ -7048,8 +7051,8 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 
 	if (sd_flag & SD_BALANCE_WAKE) {
 		record_wakee(p);
-
-		if (sched_energy_enabled()) {
+	/* [MOD] Bypass EAS for heavy tasks (util > 700) to prefer performance */
+	if (sched_energy_enabled() && task_util(p) < 700) {
 			new_cpu = find_energy_efficient_cpu(p, prev_cpu, sync);
 			if (new_cpu >= 0)
 				return new_cpu;
@@ -7175,6 +7178,10 @@ balance_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 static unsigned long wakeup_gran(struct sched_entity *se)
 {
 	unsigned long gran = sysctl_sched_wakeup_granularity;
+
+	/* [MOD] Reduce latency by 50% for heavy tasks for faster preemption */
+	if (entity_is_task(se) && task_util(task_of(se)) > 700)
+		gran >>= 1;
 
 	/*
 	 * Since its curr running now, convert the gran from real-time
