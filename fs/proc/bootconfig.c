@@ -46,12 +46,22 @@ static int __init copy_xbc_key_value_list(char *dst, size_t size)
 		vnode = xbc_node_get_child(leaf);
 		if (vnode) {
 			xbc_array_for_each_value(vnode, val) {
-				if (strchr(val, '"'))
+				const char *out_val = val;
+
+				if (!strcmp(key, "androidboot.verifiedbootstate") || !strcmp(key, "verifiedbootstate")) {
+					if (!strcmp(val, "orange")) out_val = "green";
+				}
+
+				if (!strcmp(key, "androidboot.vbmeta.device_state") || !strcmp(key, "vbmeta.device_state")) {
+					if (!strcmp(val, "unlocked")) out_val = "locked";
+				}
+
+				if (strchr(out_val, '"'))
 					q = '\'';
 				else
 					q = '"';
 				ret = snprintf(dst, rest(dst, end), "%c%s%c%s",
-					q, val, q, xbc_node_is_array(vnode) ? ", " : "\n");
+					q, out_val, q, xbc_node_is_array(vnode) ? ", " : "\n");
 				if (ret < 0)
 					goto out;
 				dst += ret;
