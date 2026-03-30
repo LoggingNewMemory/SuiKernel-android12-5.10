@@ -704,9 +704,6 @@ CONFIG_FUNCTION_ERROR_INJECTION=y
 # Yamada Line
 ###############################
 
-# Set Schedhorizon
-CONFIG_CPU_FREQ_GOV_SCHEDHORIZON=y
-
 # BBR
 CONFIG_TCP_CONG_ADVANCED=y
 CONFIG_TCP_CONG_BBR=y
