@@ -7,15 +7,12 @@
 #include <linux/workqueue.h>
 #include <linux/cpu.h>
 
-#define BOOST_DELAY_MS   5000
+#define BOOST_DELAY_MS   10000
 #define REVERT_DELAY_MS  30000
 
 static bool sandevistan_enabled = true;
 module_param(sandevistan_enabled, bool, 0644);
 MODULE_PARM_DESC(sandevistan_enabled, "Enable Sandevistan boot boost (default: true)");
-
-/* Store original minimums per policy CPU */
-static unsigned int saved_min[NR_CPUS];
 
 static struct delayed_work boost_work;
 static struct delayed_work revert_work;
@@ -33,16 +30,12 @@ static void do_boost(struct work_struct *work)
             continue;
 
         if (policy->cpu == cpu) {
-            /* Save original min */
-            saved_min[cpu] = policy->min;
-
-            /* Lock floor to ceiling */
-            policy->min = policy->max;
-            cpufreq_driver_target(policy, policy->max,
+            policy->min = policy->cpuinfo.max_freq;
+            cpufreq_driver_target(policy, policy->cpuinfo.max_freq,
                                   CPUFREQ_RELATION_H);
 
-            pr_info("sandevistan_boot: policy%u locked %u→%u KHz\n",
-                    cpu, saved_min[cpu], policy->max);
+            pr_info("sandevistan_boot: policy%u locked to %u KHz\n",
+                    cpu, policy->cpuinfo.max_freq);
         }
 
         cpufreq_cpu_put(policy);
@@ -65,13 +58,13 @@ static void do_revert(struct work_struct *work)
             continue;
 
         if (policy->cpu == cpu) {
-            /* Restore saved min */
-            policy->min = saved_min[cpu];
-            cpufreq_driver_target(policy, policy->min,
+            policy->min = policy->cpuinfo.min_freq;
+            policy->max = policy->cpuinfo.max_freq;
+            cpufreq_driver_target(policy, policy->cpuinfo.min_freq,
                                   CPUFREQ_RELATION_L);
 
-            pr_info("sandevistan_boot: policy%u restored min=%u KHz\n",
-                    cpu, policy->min);
+            pr_info("sandevistan_boot: policy%u restored min=%u max=%u KHz\n",
+                    cpu, policy->cpuinfo.min_freq, policy->cpuinfo.max_freq);
         }
 
         cpufreq_cpu_put(policy);
