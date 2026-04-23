@@ -33,6 +33,7 @@ static void do_boost(struct work_struct *work)
             policy->min = policy->cpuinfo.max_freq;
             cpufreq_driver_target(policy, policy->cpuinfo.max_freq,
                                   CPUFREQ_RELATION_H);
+            cpufreq_update_policy(cpu);
 
             pr_info("sandevistan_boot: policy%u locked to %u KHz\n",
                     cpu, policy->cpuinfo.max_freq);
@@ -62,6 +63,7 @@ static void do_revert(struct work_struct *work)
             policy->max = policy->cpuinfo.max_freq;
             cpufreq_driver_target(policy, policy->cpuinfo.min_freq,
                                   CPUFREQ_RELATION_L);
+            cpufreq_update_policy(cpu);
 
             pr_info("sandevistan_boot: policy%u restored min=%u max=%u KHz\n",
                     cpu, policy->cpuinfo.min_freq, policy->cpuinfo.max_freq);
