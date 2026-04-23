@@ -7,7 +7,7 @@
 #include <linux/workqueue.h>
 #include <linux/cpu.h>
 
-#define BOOST_DELAY_MS   5000   /* wait 5s for cpufreq to settle */
+#define BOOST_DELAY_MS   15000   /* give CPUfreq 15s to fully initialize */
 #define REVERT_DELAY_MS  30000  /* revert after 30s */
 
 static bool sandevistan_enabled = true;
@@ -20,24 +20,33 @@ static struct delayed_work revert_work;
 static void do_boost(struct work_struct *work)
 {
     unsigned int cpu;
+    int count = 0;
+
+    pr_info("sandevistan_boot: do_boost fired\n");
 
     for_each_online_cpu(cpu) {
         struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
 
-        if (!policy)
+        if (!policy) {
+            pr_info("sandevistan_boot: cpu%u — no policy\n", cpu);
             continue;
+        }
+
+        pr_info("sandevistan_boot: cpu%u policy found, cur=%u min=%u max=%u\n",
+                cpu, policy->cur, policy->min, policy->max);
 
         if (policy->cpu == cpu) {
-            cpufreq_driver_target(policy, policy->max,
-                                  CPUFREQ_RELATION_H);
-            pr_info("sandevistan_boot: cpu%u boosted to %u KHz\n",
-                    cpu, policy->max);
+            int ret = cpufreq_driver_target(policy, policy->max,
+                                            CPUFREQ_RELATION_H);
+            pr_info("sandevistan_boot: cpu%u target ret=%d\n", cpu, ret);
+            count++;
         }
 
         cpufreq_cpu_put(policy);
     }
 
-    /* Schedule revert */
+    pr_info("sandevistan_boot: boost applied to %d policies\n", count);
+
     schedule_delayed_work(&revert_work,
                           msecs_to_jiffies(REVERT_DELAY_MS));
 }
