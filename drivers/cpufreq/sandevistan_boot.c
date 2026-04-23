@@ -8,7 +8,7 @@
 #include <linux/cpu.h>
 
 #define BOOST_DELAY_MS   10000
-#define REVERT_DELAY_MS  30000
+#define REVERT_DELAY_MS  60000
 
 static bool sandevistan_enabled = true;
 module_param(sandevistan_enabled, bool, 0644);
