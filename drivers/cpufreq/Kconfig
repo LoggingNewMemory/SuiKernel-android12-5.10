@@ -242,6 +242,14 @@ config CPUFREQ_DUMMY
 
 	  If in doubt, say N
 
+config SANDEVISTAN_BOOT
+    tristate "Sandevistan Boot — temporary performance governor boost"
+    depends on CPU_FREQ && CPU_FREQ_GOV_PERFORMANCE && CPU_FREQ_GOV_SCHEDUTIL
+    help
+      Sets the CPUfreq governor to 'performance' during boot for
+      BOOST_DELAY_SEC seconds, then reverts to 'schedutil'.
+      Safe for GKI 2.0 / Android 5.10. Say M to build as a module.
+
 if X86
 source "drivers/cpufreq/Kconfig.x86"
 endif
