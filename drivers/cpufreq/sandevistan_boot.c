@@ -1,14 +1,9 @@
-// sandevistan_boot.c
-// SPDX-License-Identifier: GPL-2.0-only
-// Sandevistan Boot — Temporary CPUfreq performance boost for faster boot
-// Sets 'performance' at boot, reverts to 'schedutil' after BOOST_DELAY_SEC
-// Universal for GKI 2.0 / Android 5.10
-
 #include <linux/module.h>
 #include <linux/cpufreq.h>
 #include <linux/workqueue.h>
-#include <linux/delay.h>
 #include <linux/cpu.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
 
 #define BOOST_DELAY_SEC   30
 #define GOV_BOOST         "performance"
@@ -20,29 +15,42 @@ MODULE_PARM_DESC(sandevistan_enabled, "Enable Sandevistan boot governor boost (d
 
 static struct delayed_work revert_work;
 
-static int set_governor_all(const char *gov_name)
+static int write_governor(unsigned int cpu, const char *gov)
 {
-    int cpu, ret = 0;
+    struct file *f;
+    char path[64];
+    loff_t pos = 0;
+    int ret;
 
+    snprintf(path, sizeof(path),
+             "/sys/devices/system/cpu/cpu%u/cpufreq/scaling_governor", cpu);
+
+    f = filp_open(path, O_WRONLY, 0);
+    if (IS_ERR(f))
+        return PTR_ERR(f);
+
+    ret = kernel_write(f, gov, strlen(gov), &pos);
+    filp_close(f, NULL);
+
+    return ret < 0 ? ret : 0;
+}
+
+static void set_governor_all(const char *gov)
+{
+    int cpu;
     for_each_online_cpu(cpu) {
         struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
-
         if (!policy)
             continue;
-
-        if (strcmp(policy->governor->name, gov_name) == 0) {
-            cpufreq_cpu_put(policy);
-            continue;
+        /* Only write once per shared policy cluster */
+        if (policy->cpu == cpu) {
+            int ret = write_governor(cpu, gov);
+            if (ret)
+                pr_warn("sandevistan_boot: cpu%d → %s failed (%d)\n",
+                        cpu, gov, ret);
         }
-
-        ret = cpufreq_set_policy_governor(policy, gov_name);
-        if (ret)
-            pr_warn("sandevistan_boot: failed to set %s on cpu%d: %d\n",
-                    gov_name, cpu, ret);
-
         cpufreq_cpu_put(policy);
     }
-    return ret;
 }
 
 static void revert_governor_work(struct work_struct *work)
@@ -79,5 +87,5 @@ module_init(sandevistan_boot_init);
 module_exit(sandevistan_boot_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Your Name");
+MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Sandevistan Boot — temporary performance governor boost for faster boot");
