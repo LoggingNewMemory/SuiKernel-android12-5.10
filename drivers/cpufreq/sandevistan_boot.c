@@ -19,22 +19,19 @@ static DEFINE_MUTEX(boost_lock);
 static struct delayed_work revert_work;
 static struct notifier_block cpufreq_nb;
 
-/* Pin policy to max freq — works regardless of governor */
 static void pin_policy_max(struct cpufreq_policy *policy)
 {
-    policy->user_policy.min = policy->max;
-    policy->user_policy.max = policy->max;
-    cpufreq_update_policy(policy->cpu);
+    policy->min = policy->max;
+    cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
     pr_info("sandevistan_boot: cpu%u pinned to %u KHz\n",
             policy->cpu, policy->max);
 }
 
-/* Release freq pin — restore original min */
 static void unpin_policy(struct cpufreq_policy *policy)
 {
-    policy->user_policy.min = policy->cpuinfo.min_freq;
-    policy->user_policy.max = policy->cpuinfo.max_freq;
-    cpufreq_update_policy(policy->cpu);
+    policy->min = policy->cpuinfo.min_freq;
+    policy->max = policy->cpuinfo.max_freq;
+    cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_L);
     pr_info("sandevistan_boot: cpu%u released\n", policy->cpu);
 }
 
@@ -107,4 +104,3 @@ module_exit(sandevistan_boot_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Sandevistan Boot — max freq pin during boot, GKI 2.0 safe");
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
