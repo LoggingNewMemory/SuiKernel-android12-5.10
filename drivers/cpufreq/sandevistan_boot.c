@@ -1,73 +1,65 @@
 // sandevistan_boot.c
 // SPDX-License-Identifier: GPL-2.0-only
-// Sandevistan Boot — notifier + frequency pinning, GKI 2.0 clean
+// Sandevistan Boot — safe delayed boost, GKI 2.0
 
 #include <linux/module.h>
 #include <linux/cpufreq.h>
 #include <linux/workqueue.h>
 #include <linux/cpu.h>
-#include <linux/mutex.h>
 
-#define BOOST_DELAY_MS  30000
+#define BOOST_DELAY_MS   5000   /* wait 5s for cpufreq to settle */
+#define REVERT_DELAY_MS  30000  /* revert after 30s */
 
 static bool sandevistan_enabled = true;
 module_param(sandevistan_enabled, bool, 0644);
 MODULE_PARM_DESC(sandevistan_enabled, "Enable Sandevistan boot boost (default: true)");
 
-static bool boost_active = true;
-static DEFINE_MUTEX(boost_lock);
+static struct delayed_work boost_work;
 static struct delayed_work revert_work;
-static struct notifier_block cpufreq_nb;
 
-static void pin_policy_max(struct cpufreq_policy *policy)
+static void do_boost(struct work_struct *work)
 {
-    policy->min = policy->max;
-    cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
-    pr_info("sandevistan_boot: cpu%u pinned to %u KHz\n",
-            policy->cpu, policy->max);
-}
-
-static void unpin_policy(struct cpufreq_policy *policy)
-{
-    policy->min = policy->cpuinfo.min_freq;
-    policy->max = policy->cpuinfo.max_freq;
-    cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_L);
-    pr_info("sandevistan_boot: cpu%u released\n", policy->cpu);
-}
-
-static int cpufreq_sandevistan_notifier(struct notifier_block *nb,
-                                         unsigned long event, void *data)
-{
-    struct cpufreq_policy *policy = data;
-
-    if (event != CPUFREQ_CREATE_POLICY)
-        return NOTIFY_OK;
-
-    mutex_lock(&boost_lock);
-    if (boost_active)
-        pin_policy_max(policy);
-    mutex_unlock(&boost_lock);
-
-    return NOTIFY_OK;
-}
-
-static void revert_work_fn(struct work_struct *work)
-{
-    struct cpufreq_policy *policy;
     unsigned int cpu;
 
-    pr_info("sandevistan_boot: flatline — releasing all CPU pins\n");
-
-    mutex_lock(&boost_lock);
-    boost_active = false;
-    mutex_unlock(&boost_lock);
-
     for_each_online_cpu(cpu) {
-        policy = cpufreq_cpu_get(cpu);
+        struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+
         if (!policy)
             continue;
-        if (policy->cpu == cpu)
-            unpin_policy(policy);
+
+        if (policy->cpu == cpu) {
+            cpufreq_driver_target(policy, policy->max,
+                                  CPUFREQ_RELATION_H);
+            pr_info("sandevistan_boot: cpu%u boosted to %u KHz\n",
+                    cpu, policy->max);
+        }
+
+        cpufreq_cpu_put(policy);
+    }
+
+    /* Schedule revert */
+    schedule_delayed_work(&revert_work,
+                          msecs_to_jiffies(REVERT_DELAY_MS));
+}
+
+static void do_revert(struct work_struct *work)
+{
+    unsigned int cpu;
+
+    pr_info("sandevistan_boot: flatline — releasing boost\n");
+
+    for_each_online_cpu(cpu) {
+        struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+
+        if (!policy)
+            continue;
+
+        if (policy->cpu == cpu) {
+            cpufreq_driver_target(policy, policy->min,
+                                  CPUFREQ_RELATION_L);
+            pr_info("sandevistan_boot: cpu%u released\n", cpu);
+        }
+
         cpufreq_cpu_put(policy);
     }
 }
@@ -79,22 +71,21 @@ static int __init sandevistan_boot_init(void)
         return 0;
     }
 
-    pr_info("sandevistan_boot: jacking in — pinning CPUs to max for %dms\n",
+    pr_info("sandevistan_boot: standing by — boost in %dms\n",
             BOOST_DELAY_MS);
 
-    INIT_DELAYED_WORK(&revert_work, revert_work_fn);
+    INIT_DELAYED_WORK(&boost_work, do_boost);
+    INIT_DELAYED_WORK(&revert_work, do_revert);
 
-    cpufreq_nb.notifier_call = cpufreq_sandevistan_notifier;
-    cpufreq_register_notifier(&cpufreq_nb, CPUFREQ_POLICY_NOTIFIER);
-
-    schedule_delayed_work(&revert_work, msecs_to_jiffies(BOOST_DELAY_MS));
+    schedule_delayed_work(&boost_work,
+                          msecs_to_jiffies(BOOST_DELAY_MS));
     return 0;
 }
 
 static void __exit sandevistan_boot_exit(void)
 {
+    cancel_delayed_work_sync(&boost_work);
     cancel_delayed_work_sync(&revert_work);
-    cpufreq_unregister_notifier(&cpufreq_nb, CPUFREQ_POLICY_NOTIFIER);
     pr_info("sandevistan_boot: unloaded\n");
 }
 
@@ -102,5 +93,5 @@ module_init(sandevistan_boot_init);
 module_exit(sandevistan_boot_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Sandevistan Boot — max freq pin during boot, GKI 2.0 safe");
+MODULE_AUTHOR("Your Name");
+MODULE_DESCRIPTION("Sandevistan Boot — safe delayed freq boost, GKI 2.0");
