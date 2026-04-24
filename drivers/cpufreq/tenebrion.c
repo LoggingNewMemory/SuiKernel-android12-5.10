@@ -1,7 +1,6 @@
 // tenebrion.c
 // SPDX-License-Identifier: GPL-2.0-only
 // Tenebrion — Screen state based CPU frequency throttler
-// Ported from userspace daemon to kernel driver
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
@@ -12,7 +11,7 @@
 #include <linux/delay.h>
 #include <linux/mutex.h>
 #include <linux/fs.h>
-#include <linux/uaccess.h>
+#include <linux/pm_qos.h>
 #include <linux/slab.h>
 
 #define POLL_INTERVAL_MS    3000
@@ -31,8 +30,11 @@ static enum tenebrion_path active_path = PATH_NONE;
 static bool is_screen_off = false;
 static DEFINE_MUTEX(tenebrion_lock);
 static struct task_struct *watcher_thread;
-static unsigned int original_min[NR_CPUS];
-static unsigned int original_max[NR_CPUS];
+
+/* QoS requests per policy CPU */
+static struct freq_qos_request tenebrion_min_req[NR_CPUS];
+static struct freq_qos_request tenebrion_max_req[NR_CPUS];
+static bool qos_initialized[NR_CPUS];
 
 /* ------------------------------------------------------------------ */
 /* File read helper                                                     */
@@ -67,13 +69,11 @@ static enum tenebrion_path tenebrion_detect_path(void)
 {
     char buf[64];
 
-    /* Try DPMS first */
     if (tenebrion_read_file(DPMS_PATH, buf, sizeof(buf)) > 0) {
         pr_info("tenebrion: detected path → %s\n", DPMS_PATH);
         return PATH_DPMS;
     }
 
-    /* Fall back to backlight brightness */
     if (tenebrion_read_file(BACKLIGHT_PATH, buf, sizeof(buf)) > 0) {
         pr_info("tenebrion: detected path → %s\n", BACKLIGHT_PATH);
         return PATH_BACKLIGHT;
@@ -117,7 +117,43 @@ static int tenebrion_get_screen_state(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* CPUFreq — drop to min                                               */
+/* QoS init — add requests for all online policies                     */
+/* ------------------------------------------------------------------ */
+
+static void tenebrion_qos_init(void)
+{
+    unsigned int cpu;
+    struct cpufreq_policy *policy;
+
+    for_each_online_cpu(cpu) {
+        policy = cpufreq_cpu_get(cpu);
+        if (!policy)
+            continue;
+
+        if (policy->cpu == cpu && !qos_initialized[cpu]) {
+            /* Add min QoS request — start unconstrained */
+            freq_qos_add_request(&policy->constraints,
+                                 &tenebrion_min_req[cpu],
+                                 FREQ_QOS_MIN,
+                                 policy->cpuinfo.min_freq);
+
+            /* Add max QoS request — start unconstrained */
+            freq_qos_add_request(&policy->constraints,
+                                 &tenebrion_max_req[cpu],
+                                 FREQ_QOS_MAX,
+                                 policy->cpuinfo.max_freq);
+
+            qos_initialized[cpu] = true;
+
+            pr_info("tenebrion: QoS initialized for policy%u\n", cpu);
+        }
+
+        cpufreq_cpu_put(policy);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* CPUFreq — drop to min via QoS                                       */
 /* ------------------------------------------------------------------ */
 
 static void tenebrion_set_min_freq(void)
@@ -130,17 +166,13 @@ static void tenebrion_set_min_freq(void)
         if (!policy)
             continue;
 
-        if (policy->cpu == cpu) {
-            original_min[cpu] = policy->min ?
-                                 policy->min : policy->cpuinfo.min_freq;
-            original_max[cpu] = policy->max ?
-                                 policy->max : policy->cpuinfo.max_freq;
-
-            policy->min = policy->cpuinfo.min_freq;
-            policy->max = policy->cpuinfo.min_freq;
-            cpufreq_driver_target(policy, policy->cpuinfo.min_freq,
-                                  CPUFREQ_RELATION_L);
-            cpufreq_update_policy(cpu);
+        if (policy->cpu == cpu && qos_initialized[cpu]) {
+            /* Pin max to hardware min — governor can't go above */
+            freq_qos_update_request(&tenebrion_max_req[cpu],
+                                    policy->cpuinfo.min_freq);
+            /* Pin min to hardware min as well */
+            freq_qos_update_request(&tenebrion_min_req[cpu],
+                                    policy->cpuinfo.min_freq);
 
             pr_info("tenebrion: policy%u → %u KHz (screen off)\n",
                     cpu, policy->cpuinfo.min_freq);
@@ -151,7 +183,7 @@ static void tenebrion_set_min_freq(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* CPUFreq — restore                                                    */
+/* CPUFreq — restore via QoS                                           */
 /* ------------------------------------------------------------------ */
 
 static void tenebrion_restore_freq(void)
@@ -164,20 +196,38 @@ static void tenebrion_restore_freq(void)
         if (!policy)
             continue;
 
-        if (policy->cpu == cpu) {
-            policy->min = original_min[cpu] ?
-                          original_min[cpu] : policy->cpuinfo.min_freq;
-            policy->max = original_max[cpu] ?
-                          original_max[cpu] : policy->cpuinfo.max_freq;
-            cpufreq_driver_target(policy, policy->max,
-                                  CPUFREQ_RELATION_H);
-            cpufreq_update_policy(cpu);
+        if (policy->cpu == cpu && qos_initialized[cpu]) {
+            /* Restore max to hardware max */
+            freq_qos_update_request(&tenebrion_max_req[cpu],
+                                    policy->cpuinfo.max_freq);
+            /* Restore min to hardware min */
+            freq_qos_update_request(&tenebrion_min_req[cpu],
+                                    policy->cpuinfo.min_freq);
 
             pr_info("tenebrion: policy%u restored min=%u max=%u KHz\n",
-                    cpu, policy->min, policy->max);
+                    cpu,
+                    policy->cpuinfo.min_freq,
+                    policy->cpuinfo.max_freq);
         }
 
         cpufreq_cpu_put(policy);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* QoS cleanup                                                          */
+/* ------------------------------------------------------------------ */
+
+static void tenebrion_qos_cleanup(void)
+{
+    unsigned int cpu;
+
+    for_each_possible_cpu(cpu) {
+        if (qos_initialized[cpu]) {
+            freq_qos_remove_request(&tenebrion_min_req[cpu]);
+            freq_qos_remove_request(&tenebrion_max_req[cpu]);
+            qos_initialized[cpu] = false;
+        }
     }
 }
 
@@ -192,9 +242,13 @@ static int tenebrion_watcher(void *data)
 
     pr_info("tenebrion: watcher started, polling every %dms\n",
             POLL_INTERVAL_MS);
-    
+
+    /* Wait for Android SELinux policy + KernelSU rules to be applied */
     msleep(15000);
-    
+
+    /* Initialize QoS requests after delay */
+    tenebrion_qos_init();
+
     while (!kthread_should_stop()) {
         /* Retry path detection if not found at init */
         if (active_path == PATH_NONE)
@@ -231,6 +285,8 @@ static int tenebrion_watcher(void *data)
 
 static int __init tenebrion_init(void)
 {
+    memset(qos_initialized, 0, sizeof(qos_initialized));
+
     active_path = tenebrion_detect_path();
     if (active_path == PATH_NONE)
         pr_warn("tenebrion: no screen state path found — will retry in watcher\n");
@@ -257,6 +313,8 @@ static void __exit tenebrion_exit(void)
         is_screen_off = false;
         mutex_unlock(&tenebrion_lock);
     }
+
+    tenebrion_qos_cleanup();
 
     pr_info("tenebrion: unloaded\n");
 }
