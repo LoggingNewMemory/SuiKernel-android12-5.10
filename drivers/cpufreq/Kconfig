@@ -258,6 +258,14 @@ config YAMADA_GAMING_BOOST
       to 0 on touch/key input events. Reverts after boost window.
       Author: Kanagawa Yamada. Say Y or M.
 
+config YAMADA_TENEBRION
+    tristate "Tenebrion — CPU freq drop on screen off"
+    depends on CPU_FREQ && FB
+    help
+      Sets all CPU frequencies to minimum when screen turns off,
+      restores full range when screen turns on.
+      Author: Kanagawa Yamada. Say Y or M.
+
 if X86
 source "drivers/cpufreq/Kconfig.x86"
 endif

@@ -122,3 +122,7 @@ obj-$(CONFIG_SANDEVISTAN_BOOT) += sandevistan_boot.o
 ##################################################################################
 # Yamada Game Boost (Yamada)
 obj-$(CONFIG_YAMADA_GAMING_BOOST) += yamada_gaming_boost.o
+
+##################################################################################
+# Tenebrion (Yamada)
+obj-$(CONFIG_YAMADA_TENEBRION) += tenebrion.o
