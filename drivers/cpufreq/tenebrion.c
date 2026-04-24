@@ -244,7 +244,7 @@ static int tenebrion_watcher(void *data)
             POLL_INTERVAL_MS);
 
     /* Wait for Android SELinux policy + KernelSU rules to be applied */
-    msleep(15000);
+    msleep(40000);
 
     /* Initialize QoS requests after delay */
     tenebrion_qos_init();
