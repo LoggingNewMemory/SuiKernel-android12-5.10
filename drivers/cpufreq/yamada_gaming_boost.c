@@ -22,6 +22,21 @@ module_param(boost_duration_ms, uint, 0644);
 MODULE_PARM_DESC(boost_duration_ms, "Boost duration in ms after last input (default: 500)");
 
 /* ------------------------------------------------------------------ */
+/* Copied from kernel/sched/cpufreq_schedutil.c — not exported         */
+/* ------------------------------------------------------------------ */
+
+struct sugov_tunables {
+    struct gov_attr_set     attr_set;
+    unsigned int            rate_limit_us;
+};
+
+struct sugov_policy {
+    struct cpufreq_policy   *policy;
+    struct sugov_tunables   *tunables;
+    /* We only need the above two fields — rest omitted intentionally */
+};
+
+/* ------------------------------------------------------------------ */
 /* State                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -34,7 +49,7 @@ static unsigned int saved_rate_limit_us[NR_CPUS];
 static unsigned int saved_min[NR_CPUS];
 
 /* ------------------------------------------------------------------ */
-/* Schedutil rate_limit_us helpers                                      */
+/* Schedutil rate_limit_us helper                                       */
 /* ------------------------------------------------------------------ */
 
 static void set_schedutil_rate_limit(struct cpufreq_policy *policy,
@@ -42,8 +57,10 @@ static void set_schedutil_rate_limit(struct cpufreq_policy *policy,
 {
     struct sugov_policy *sg_policy = policy->governor_data;
 
-    if (sg_policy && sg_policy->tunables)
-        sg_policy->tunables->rate_limit_us = rate_limit_us;
+    if (!sg_policy || !sg_policy->tunables)
+        return;
+
+    sg_policy->tunables->rate_limit_us = rate_limit_us;
 }
 
 /* ------------------------------------------------------------------ */
