@@ -743,4 +743,8 @@ CONFIG_ZRAM_LZ4_COMPRESS=y
 CONFIG_ZRAM_DEF_COMP_LZ4=y
 CONFIG_ZSWAP=n
 
+###########################
+# Yamada Special
+###########################
 CONFIG_SANDEVISTAN_BOOT=y
+CONFIG_YAMADA_GAMING_BOOST=y

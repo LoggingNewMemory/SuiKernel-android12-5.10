@@ -250,6 +250,14 @@ config SANDEVISTAN_BOOT
       BOOST_DELAY_SEC seconds, then reverts to 'schedutil'.
       Safe for GKI 2.0 / Android 5.10. Say M to build as a module.
 
+config YAMADA_GAMING_BOOST
+    tristate "Yamada Gaming Boost — CPU input boost + schedutil tuning"
+    depends on CPU_FREQ && CPU_FREQ_GOV_SCHEDUTIL && INPUT
+    help
+      Boosts CPU to max frequency and sets schedutil rate_limit_us
+      to 0 on touch/key input events. Reverts after boost window.
+      Author: Kanagawa Yamada. Say Y or M.
+
 if X86
 source "drivers/cpufreq/Kconfig.x86"
 endif
