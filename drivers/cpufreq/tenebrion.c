@@ -18,7 +18,7 @@ static bool is_screen_off = false;
 static DEFINE_MUTEX(tenebrion_lock);
 
 /* ------------------------------------------------------------------ */
-/* Screen OFF — drop max to cpuinfo.min_freq                           */
+/* Screen OFF (Suspend) — drop max to hardware min                    */
 /* ------------------------------------------------------------------ */
 
 static void tenebrion_set_min_freq(struct work_struct *work)
@@ -37,15 +37,16 @@ static void tenebrion_set_min_freq(struct work_struct *work)
             continue;
 
         if (policy->cpu == cpu) {
-            /* Save originals using cpuinfo — always valid */
-            original_min[cpu] = policy->cpuinfo.min_freq;
-            original_max[cpu] = policy->cpuinfo.max_freq;
+            /* Save the CURRENT user limits, NOT the hardware max, 
+               so we don't break user underclocks when restoring */
+            original_min[cpu] = policy->min;
+            original_max[cpu] = policy->max;
 
             /* Drop both min and max to hardware minimum */
             policy->min = policy->cpuinfo.min_freq;
             policy->max = policy->cpuinfo.min_freq;
-            cpufreq_driver_target(policy, policy->cpuinfo.min_freq,
-                                  CPUFREQ_RELATION_L);
+            
+            /* Updating policy is enough; the governor handles the target */
             cpufreq_update_policy(cpu);
 
             pr_info("tenebrion: policy%u throttled to %u KHz\n",
@@ -56,14 +57,14 @@ static void tenebrion_set_min_freq(struct work_struct *work)
     }
 
     is_screen_off = true;
-    pr_info("tenebrion: screen off — all CPUs at minimum\n");
+    pr_info("tenebrion: suspend active — all CPUs at minimum\n");
 
 out:
     mutex_unlock(&tenebrion_lock);
 }
 
 /* ------------------------------------------------------------------ */
-/* Screen ON — restore full freq range                                  */
+/* Screen ON (Resume) — restore previous freq range                   */
 /* ------------------------------------------------------------------ */
 
 static void tenebrion_restore_freq(struct work_struct *work)
@@ -82,23 +83,21 @@ static void tenebrion_restore_freq(struct work_struct *work)
             continue;
 
         if (policy->cpu == cpu) {
-            policy->min = policy->cpuinfo.min_freq;
-            policy->max = policy->cpuinfo.max_freq;
-            cpufreq_driver_target(policy, policy->cpuinfo.max_freq,
-                                  CPUFREQ_RELATION_H);
+            /* Restore the limits the user actually had before sleep */
+            policy->min = original_min[cpu];
+            policy->max = original_max[cpu];
+            
             cpufreq_update_policy(cpu);
 
             pr_info("tenebrion: policy%u restored min=%u max=%u KHz\n",
-                    cpu,
-                    policy->cpuinfo.min_freq,
-                    policy->cpuinfo.max_freq);
+                    cpu, original_min[cpu], original_max[cpu]);
         }
 
         cpufreq_cpu_put(policy);
     }
 
     is_screen_off = false;
-    pr_info("tenebrion: screen on — all CPUs restored\n");
+    pr_info("tenebrion: resume active — all CPUs restored\n");
 
 out:
     mutex_unlock(&tenebrion_lock);
@@ -108,7 +107,7 @@ static DECLARE_WORK(min_freq_work, tenebrion_set_min_freq);
 static DECLARE_WORK(restore_freq_work, tenebrion_restore_freq);
 
 /* ------------------------------------------------------------------ */
-/* PM Notifier                                                          */
+/* PM Notifier                                                        */
 /* ------------------------------------------------------------------ */
 
 static int tenebrion_pm_notifier(struct notifier_block *nb,
@@ -134,7 +133,7 @@ static struct notifier_block tenebrion_pm_nb = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Init / Exit                                                          */
+/* Init / Exit                                                        */
 /* ------------------------------------------------------------------ */
 
 static int __init tenebrion_init(void)
@@ -147,12 +146,16 @@ static int __init tenebrion_init(void)
 static void __exit tenebrion_exit(void)
 {
     unregister_pm_notifier(&tenebrion_pm_nb);
+    
+    /* If we are unloading while throttled, synchronously restore.
+       Do not schedule_work here, as the module might unload before 
+       the workqueue executes, causing a kernel panic. */
+    if (is_screen_off) {
+        tenebrion_restore_freq(NULL); 
+    }
+
     cancel_work_sync(&min_freq_work);
     cancel_work_sync(&restore_freq_work);
-
-    /* Always restore on unload */
-    if (is_screen_off)
-        schedule_work(&restore_freq_work);
 
     pr_info("tenebrion: unloaded\n");
 }
@@ -160,6 +163,6 @@ static void __exit tenebrion_exit(void)
 module_init(tenebrion_init);
 module_exit(tenebrion_exit);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Tenebrion: Screen state based CPU frequency throttler");
+MODULE_DESCRIPTION("Tenebrion: Suspend state based CPU frequency throttler");
