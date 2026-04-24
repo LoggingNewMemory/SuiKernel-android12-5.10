@@ -1,6 +1,6 @@
 // yamada_gaming_boost.c
 // SPDX-License-Identifier: GPL-2.0-only
-// Yamada Gaming Boost — CPU Input Boost + Schedutil Rate Limit Tuning
+// Yamada Gaming Boost — CPU Input Boost + Schedutil Rate Limit Tuning (PM QoS Method)
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
@@ -10,6 +10,7 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
+#include <linux/pm_qos.h>
 
 #define BOOST_DURATION_MS   500
 
@@ -33,7 +34,6 @@ struct sugov_tunables {
 struct sugov_policy {
     struct cpufreq_policy   *policy;
     struct sugov_tunables   *tunables;
-    /* We only need the above two fields — rest omitted intentionally */
 };
 
 /* ------------------------------------------------------------------ */
@@ -46,7 +46,10 @@ static struct delayed_work boost_off_work;
 static struct input_handler yamada_input_handler;
 
 static unsigned int saved_rate_limit_us[NR_CPUS];
-static unsigned int saved_min[NR_CPUS];
+
+/* QoS requests per policy CPU */
+static struct freq_qos_request yamada_min_req[NR_CPUS];
+static bool qos_initialized[NR_CPUS];
 
 /* ------------------------------------------------------------------ */
 /* Schedutil rate_limit_us helper                                       */
@@ -80,20 +83,21 @@ static void do_boost_on(void)
         if (policy->cpu == cpu) {
             struct sugov_policy *sg_policy = policy->governor_data;
 
-            /* Save current state */
-            saved_min[cpu] = policy->min ?
-                             policy->min : policy->cpuinfo.min_freq;
-
             /* Save schedutil rate_limit_us */
             if (sg_policy && sg_policy->tunables)
-                saved_rate_limit_us[cpu] =
-                    sg_policy->tunables->rate_limit_us;
+                saved_rate_limit_us[cpu] = sg_policy->tunables->rate_limit_us;
 
-            /* Pin CPU to max */
-            policy->min = policy->cpuinfo.max_freq;
-            cpufreq_driver_target(policy, policy->cpuinfo.max_freq,
-                                  CPUFREQ_RELATION_H);
-            cpufreq_update_policy(cpu);
+            /* Pin CPU to max via QoS */
+            if (!qos_initialized[cpu]) {
+                freq_qos_add_request(&policy->constraints,
+                                     &yamada_min_req[cpu],
+                                     FREQ_QOS_MIN,
+                                     policy->cpuinfo.max_freq);
+                qos_initialized[cpu] = true;
+            } else {
+                freq_qos_update_request(&yamada_min_req[cpu],
+                                        policy->cpuinfo.max_freq);
+            }
 
             /* Set schedutil rate_limit_us to 0 for instant response */
             set_schedutil_rate_limit(policy, 0);
@@ -124,21 +128,37 @@ static void do_boost_off(struct work_struct *work)
         if (policy->cpu == cpu) {
             struct sugov_policy *sg_policy = policy->governor_data;
 
-            /* Restore CPU min */
-            policy->min = saved_min[cpu] ?
-                          saved_min[cpu] : policy->cpuinfo.min_freq;
-            cpufreq_update_policy(cpu);
+            /* Restore CPU min via QoS */
+            if (qos_initialized[cpu]) {
+                freq_qos_update_request(&yamada_min_req[cpu],
+                                        policy->cpuinfo.min_freq);
+            }
 
             /* Restore schedutil rate_limit_us */
             if (sg_policy && sg_policy->tunables)
-                sg_policy->tunables->rate_limit_us =
-                    saved_rate_limit_us[cpu];
+                sg_policy->tunables->rate_limit_us = saved_rate_limit_us[cpu];
         }
 
         cpufreq_cpu_put(policy);
     }
 
     pr_debug("yamada_gaming_boost: boost off\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* QoS cleanup                                                          */
+/* ------------------------------------------------------------------ */
+
+static void yamada_qos_cleanup(void)
+{
+    unsigned int cpu;
+
+    for_each_possible_cpu(cpu) {
+        if (qos_initialized[cpu]) {
+            freq_qos_remove_request(&yamada_min_req[cpu]);
+            qos_initialized[cpu] = false;
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -233,6 +253,7 @@ static int __init yamada_gaming_boost_init(void)
         return 0;
     }
 
+    memset(qos_initialized, 0, sizeof(qos_initialized));
     INIT_DELAYED_WORK(&boost_off_work, do_boost_off);
 
     yamada_input_handler.event      = yamada_input_event;
@@ -261,6 +282,8 @@ static void __exit yamada_gaming_boost_exit(void)
     if (boost_active)
         do_boost_off(NULL);
 
+    yamada_qos_cleanup();
+
     pr_info("yamada_gaming_boost: unloaded\n");
 }
 
@@ -269,4 +292,4 @@ module_exit(yamada_gaming_boost_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Yamada Gaming Boost — CPU input boost + schedutil rate limit tuning");
+MODULE_DESCRIPTION("Yamada Gaming Boost — CPU input boost + schedutil rate limit tuning (PM QoS Method)");
