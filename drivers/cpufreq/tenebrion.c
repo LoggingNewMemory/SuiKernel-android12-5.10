@@ -192,7 +192,9 @@ static int tenebrion_watcher(void *data)
 
     pr_info("tenebrion: watcher started, polling every %dms\n",
             POLL_INTERVAL_MS);
-
+    
+    msleep(15000);
+    
     while (!kthread_should_stop()) {
         /* Retry path detection if not found at init */
         if (active_path == PATH_NONE)
