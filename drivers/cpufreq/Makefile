@@ -118,3 +118,7 @@ obj-$(CONFIG_SPARC_US3_CPUFREQ)		+= sparc-us3-cpufreq.o
 ##################################################################################
 # Sandevistan Boot (Yamada)
 obj-$(CONFIG_SANDEVISTAN_BOOT) += sandevistan_boot.o
+
+##################################################################################
+# Yamada Game Boost (Yamada)
+obj-$(CONFIG_YAMADA_GAMING_BOOST) += yamada_gaming_boost.o
