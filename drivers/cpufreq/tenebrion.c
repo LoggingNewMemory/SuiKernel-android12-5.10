@@ -1,68 +1,83 @@
 // tenebrion.c
 // SPDX-License-Identifier: GPL-2.0-only
-// Tenebrion — CPU freq floor drop on screen off
+// Tenebrion — Screen state based CPU frequency throttler
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
-#include <linux/cpu.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/cpufreq.h>
+#include <linux/notifier.h>
 #include <linux/workqueue.h>
-#include <linux/fb.h>
+#include <linux/suspend.h>
+#include <linux/mutex.h>
 
-static bool tenebrion_enabled = true;
-module_param(tenebrion_enabled, bool, 0644);
-MODULE_PARM_DESC(tenebrion_enabled, "Enable Tenebrion (default: true)");
-
-static struct work_struct screen_off_work;
-static struct work_struct screen_on_work;
-static struct notifier_block fb_notif;
+static unsigned int original_max[NR_CPUS];
+static unsigned int original_min[NR_CPUS];
+static bool is_screen_off = false;
+static DEFINE_MUTEX(tenebrion_lock);
 
 /* ------------------------------------------------------------------ */
-/* Screen OFF — set all CPU min to cpuinfo.min_freq                    */
+/* Screen OFF — drop max to cpuinfo.min_freq                           */
 /* ------------------------------------------------------------------ */
 
-static void do_screen_off(struct work_struct *work)
+static void tenebrion_set_min_freq(struct work_struct *work)
 {
     unsigned int cpu;
+    struct cpufreq_policy *policy;
 
-    pr_info("tenebrion: screen off — dropping CPU floors\n");
+    mutex_lock(&tenebrion_lock);
+
+    if (is_screen_off)
+        goto out;
 
     for_each_online_cpu(cpu) {
-        struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
-
+        policy = cpufreq_cpu_get(cpu);
         if (!policy)
             continue;
 
         if (policy->cpu == cpu) {
+            /* Save originals using cpuinfo — always valid */
+            original_min[cpu] = policy->cpuinfo.min_freq;
+            original_max[cpu] = policy->cpuinfo.max_freq;
+
+            /* Drop both min and max to hardware minimum */
             policy->min = policy->cpuinfo.min_freq;
             policy->max = policy->cpuinfo.min_freq;
             cpufreq_driver_target(policy, policy->cpuinfo.min_freq,
                                   CPUFREQ_RELATION_L);
             cpufreq_update_policy(cpu);
 
-            pr_info("tenebrion: policy%u → min=%u max=%u KHz\n",
-                    cpu,
-                    policy->cpuinfo.min_freq,
-                    policy->cpuinfo.min_freq);
+            pr_info("tenebrion: policy%u throttled to %u KHz\n",
+                    cpu, policy->cpuinfo.min_freq);
         }
 
         cpufreq_cpu_put(policy);
     }
+
+    is_screen_off = true;
+    pr_info("tenebrion: screen off — all CPUs at minimum\n");
+
+out:
+    mutex_unlock(&tenebrion_lock);
 }
 
 /* ------------------------------------------------------------------ */
 /* Screen ON — restore full freq range                                  */
 /* ------------------------------------------------------------------ */
 
-static void do_screen_on(struct work_struct *work)
+static void tenebrion_restore_freq(struct work_struct *work)
 {
     unsigned int cpu;
+    struct cpufreq_policy *policy;
 
-    pr_info("tenebrion: screen on — restoring CPU freq range\n");
+    mutex_lock(&tenebrion_lock);
+
+    if (!is_screen_off)
+        goto out;
 
     for_each_online_cpu(cpu) {
-        struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
-
+        policy = cpufreq_cpu_get(cpu);
         if (!policy)
             continue;
 
@@ -73,7 +88,7 @@ static void do_screen_on(struct work_struct *work)
                                   CPUFREQ_RELATION_H);
             cpufreq_update_policy(cpu);
 
-            pr_info("tenebrion: policy%u → min=%u max=%u KHz\n",
+            pr_info("tenebrion: policy%u restored min=%u max=%u KHz\n",
                     cpu,
                     policy->cpuinfo.min_freq,
                     policy->cpuinfo.max_freq);
@@ -81,37 +96,42 @@ static void do_screen_on(struct work_struct *work)
 
         cpufreq_cpu_put(policy);
     }
+
+    is_screen_off = false;
+    pr_info("tenebrion: screen on — all CPUs restored\n");
+
+out:
+    mutex_unlock(&tenebrion_lock);
 }
 
+static DECLARE_WORK(min_freq_work, tenebrion_set_min_freq);
+static DECLARE_WORK(restore_freq_work, tenebrion_restore_freq);
+
 /* ------------------------------------------------------------------ */
-/* FB Notifier                                                          */
+/* PM Notifier                                                          */
 /* ------------------------------------------------------------------ */
 
-static int tenebrion_fb_notifier_call(struct notifier_block *nb,
-                                       unsigned long action,
-                                       void *data)
+static int tenebrion_pm_notifier(struct notifier_block *nb,
+                                  unsigned long event, void *data)
 {
-    struct fb_event *evdata = data;
-    int *blank;
-
-    if (action != FB_EVENT_BLANK)
-        return NOTIFY_OK;
-
-    if (!evdata || !evdata->data)
-        return NOTIFY_OK;
-
-    blank = evdata->data;
-
-    if (*blank == FB_BLANK_UNBLANK) {
-        /* Screen on */
-        schedule_work(&screen_on_work);
-    } else if (*blank == FB_BLANK_POWERDOWN) {
-        /* Screen off */
-        schedule_work(&screen_off_work);
+    switch (event) {
+    case PM_SUSPEND_PREPARE:
+        /* System going to sleep — screen is off */
+        schedule_work(&min_freq_work);
+        break;
+    case PM_POST_SUSPEND:
+        /* System resumed — screen coming back on */
+        schedule_work(&restore_freq_work);
+        break;
     }
 
     return NOTIFY_OK;
 }
+
+static struct notifier_block tenebrion_pm_nb = {
+    .notifier_call = tenebrion_pm_notifier,
+    .priority      = INT_MAX,
+};
 
 /* ------------------------------------------------------------------ */
 /* Init / Exit                                                          */
@@ -119,32 +139,27 @@ static int tenebrion_fb_notifier_call(struct notifier_block *nb,
 
 static int __init tenebrion_init(void)
 {
-    if (!tenebrion_enabled) {
-        pr_info("tenebrion: disabled\n");
-        return 0;
-    }
-
-    INIT_WORK(&screen_off_work, do_screen_off);
-    INIT_WORK(&screen_on_work, do_screen_on);
-
-    fb_notif.notifier_call = tenebrion_fb_notifier_call;
-    fb_register_client(&fb_notif);
-
-    pr_info("tenebrion: active — watching screen state\n");
+    register_pm_notifier(&tenebrion_pm_nb);
+    pr_info("tenebrion: active — watching suspend state\n");
     return 0;
 }
 
 static void __exit tenebrion_exit(void)
 {
-    fb_unregister_client(&fb_notif);
-    cancel_work_sync(&screen_off_work);
-    cancel_work_sync(&screen_on_work);
+    unregister_pm_notifier(&tenebrion_pm_nb);
+    cancel_work_sync(&min_freq_work);
+    cancel_work_sync(&restore_freq_work);
+
+    /* Always restore on unload */
+    if (is_screen_off)
+        schedule_work(&restore_freq_work);
+
     pr_info("tenebrion: unloaded\n");
 }
 
 module_init(tenebrion_init);
 module_exit(tenebrion_exit);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Tenebrion — CPU freq floor drop on screen off");
+MODULE_DESCRIPTION("Tenebrion: Screen state based CPU frequency throttler");

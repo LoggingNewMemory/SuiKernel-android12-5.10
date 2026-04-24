@@ -260,10 +260,10 @@ config YAMADA_GAMING_BOOST
 
 config YAMADA_TENEBRION
     tristate "Tenebrion — CPU freq drop on screen off"
-    depends on CPU_FREQ && FB
+    depends on CPU_FREQ && SUSPEND
     help
-      Sets all CPU frequencies to minimum when screen turns off,
-      restores full range when screen turns on.
+      Drops all CPU frequencies to minimum on system suspend,
+      restores full range on resume.
       Author: Kanagawa Yamada. Say Y or M.
 
 if X86
