@@ -423,6 +423,14 @@ config AMLOGIC_THERMAL
 	  This driver can also be built as a module. If so, the module will
 	  be called amlogic_thermal.
 
+config YAMADA_ANYA_THERMAL
+    tristate "Anya Disable Thermal — kernel-side thermal zone disabler"
+    depends on CPU_FREQ
+    help
+      Disables all thermal zones at boot by writing 'disabled'
+      to each thermal zone's mode sysfs node.
+      Author: Kanagawa Yamada. Say Y or M.
+
 menu "Intel thermal drivers"
 depends on X86 || X86_INTEL_QUARK || COMPILE_TEST
 source "drivers/thermal/intel/Kconfig"
