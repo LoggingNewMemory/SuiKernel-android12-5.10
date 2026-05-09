@@ -1244,16 +1244,42 @@ static void override_custom_release(char __user *release, size_t len)
 {
 #ifdef CONFIG_UNAME_OVERRIDE
 	char *buf;
+	char *targets_copy, *target, *orig_targets;
+	bool match = false;
 
+	/* Get the name of the app asking for the kernel version */
 	buf = kstrdup_quotable_cmdline(current, GFP_KERNEL);
 	if (buf == NULL)
 		return;
 
-	if (strstr(buf, CONFIG_UNAME_OVERRIDE_TARGET)) {
+	/* Create a copy of our target list because strsep will modify it during parsing */
+	orig_targets = targets_copy = kstrdup(CONFIG_UNAME_OVERRIDE_TARGET, GFP_KERNEL);
+	if (orig_targets == NULL) {
+		kfree(buf);
+		return;
+	}
+
+	/* Split the list by commas and check each target */
+	while ((target = strsep(&targets_copy, ",")) != NULL) {
+		/* Skip empty strings if there are trailing commas */
+		if (*target == '\0')
+			continue;
+			
+		/* If the current app matches one of our targets, flag it! */
+		if (strstr(buf, target)) {
+			match = true;
+			break;
+		}
+	}
+
+	/* If a match was found, deploy the fake ID! */
+	if (match) {
 		copy_to_user(release, CONFIG_UNAME_OVERRIDE_STRING,
 			       strlen(CONFIG_UNAME_OVERRIDE_STRING) + 1);
 	}
 
+	/* Clean up our tracks (free memory) so we don't cause a memory leak/kernel panic */
+	kfree(orig_targets);
 	kfree(buf);
 #endif
 }
