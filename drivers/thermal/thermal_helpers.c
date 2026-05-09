@@ -75,12 +75,23 @@ EXPORT_SYMBOL(get_thermal_instance);
  *
  * Return: On success returns 0, an error code otherwise
  */
+
+ /*
+ Anya Thermal Line
+ This one is modified by Kanagawa Yamada to make the Temp spoof to 30
+ */
 int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 {
 	int ret = -EINVAL;
 	int count;
 	int crit_temp = INT_MAX;
 	enum thermal_trip_type type;
+
+	// Modification of Anya Thermal. Spoof to 30 Celcius
+	if (temp) {
+		*temp = 30000;
+		return 0;
+	}
 
 	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
 		goto exit;
