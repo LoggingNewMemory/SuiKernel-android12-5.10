@@ -449,10 +449,18 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
 	monitor_thermal_zone(tz);
 }
 
+ /*
+ Anya Thermal Line
+ This one is modified by Kanagawa Yamada to make the Temp spoof to 30
+ */
 static void update_temperature(struct thermal_zone_device *tz)
 {
 	int temp, ret;
-
+	// Anya Thermal Definition
+	temp = 30000;
+	ret = 0;
+	
+	/*
 	ret = thermal_zone_get_temp(tz, &temp);
 	if (ret) {
 		if (ret != -EAGAIN)
@@ -461,6 +469,7 @@ static void update_temperature(struct thermal_zone_device *tz)
 				 ret);
 		return;
 	}
+	*/
 
 	mutex_lock(&tz->lock);
 	tz->last_temperature = tz->temperature;
