@@ -750,3 +750,11 @@ CONFIG_SANDEVISTAN_BOOT=y
 CONFIG_YAMADA_GAMING_BOOST=y
 CONFIG_YAMADA_TENEBRION=y
 CONFIG_YAMADA_ANYA_THERMAL=y
+
+###########################
+# Spoof Uname
+###########################
+
+CONFIG_UNAME_OVERRIDE=y
+CONFIG_UNAME_OVERRIDE_TARGET="com.google.android.gms,com.alfamart.alfagift,com.android.vending"
+CONFIG_UNAME_OVERRIDE_STRING="5.10.198-android12-9-00019-g6efebf1322d6-ab11471183"
