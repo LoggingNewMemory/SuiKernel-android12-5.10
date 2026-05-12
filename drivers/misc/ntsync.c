@@ -1253,7 +1253,7 @@ static int __init ntsync_init(void)
         return ret;
 
     INIT_DELAYED_WORK(&ntsync_perm_work, ntsync_fix_perms_worker);
-    schedule_delayed_work(&ntsync_perm_work, msecs_to_jiffies(2000));
+    schedule_delayed_work(&ntsync_perm_work, msecs_to_jiffies(35000));
 
     return 0;
 }
