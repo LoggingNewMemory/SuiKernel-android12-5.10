@@ -494,6 +494,12 @@ config OCHINAI_INAHO_AUDIO
       via PM QoS, and expands CPUSet for audio processes to include
       all cores. Author: Kanagawa Yamada. Say Y or M.
 
+config SPARXIE_SWAP_TUNER
+	tristate "Tune the swappiness value"
+	help
+	  Change the value of the swappiness, by this I make it 30 check
+	  using cat /proc/sys/vm/swappiness
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
