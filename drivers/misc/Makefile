@@ -61,3 +61,4 @@ obj-$(CONFIG_HISI_HIKEY_USB)	+= hisi_hikey_usb.o
 obj-$(CONFIG_UID_SYS_STATS)	+= uid_sys_stats.o
 obj-$(CONFIG_OCHINAI_INAHO_AUDIO) += ochinai_inaho_audio.o
 obj-$(CONFIG_SPARXIE_SWAP_TUNER) += sparxie_swapiness_tuner.o
+obj-$(CONFIG_RACO_RC_OVERRIDE) += raco_rc_override.o
