@@ -28,7 +28,7 @@ module_param(inaho_enabled, bool, 0644);
 MODULE_PARM_DESC(inaho_enabled, "Enable Ochinai Inaho Audio (default: true)");
 
 /* PM QoS request — prevents CPU deep idle during audio */
-static struct cpu_latency_qos_request inaho_pm_qos;
+static struct pm_qos_request inaho_pm_qos;
 static bool pm_qos_active = false;
 
 static struct task_struct *inaho_thread;
