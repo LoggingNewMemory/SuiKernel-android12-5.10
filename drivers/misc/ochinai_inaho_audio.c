@@ -15,6 +15,7 @@
 #include <linux/pm_qos.h>
 #include <linux/cpu.h>
 #include <linux/rcupdate.h>
+#include <uapi/linux/sched/types.h>
 
 #define ENGAGE_DELAY_MS     20000
 #define AUDIO_SCAN_MS       5000
@@ -27,7 +28,7 @@ module_param(inaho_enabled, bool, 0644);
 MODULE_PARM_DESC(inaho_enabled, "Enable Ochinai Inaho Audio (default: true)");
 
 /* PM QoS request — prevents CPU deep idle during audio */
-static struct pm_qos_request inaho_pm_qos;
+static struct cpu_latency_qos_request inaho_pm_qos;
 static bool pm_qos_active = false;
 
 static struct task_struct *inaho_thread;
@@ -133,9 +134,7 @@ static void inaho_pm_qos_engage(void)
     if (pm_qos_active)
         return;
 
-    pm_qos_add_request(&inaho_pm_qos,
-                       PM_QOS_CPU_DMA_LATENCY,
-                       PM_QOS_LATENCY_US);
+    cpu_latency_qos_add_request(&inaho_pm_qos, PM_QOS_LATENCY_US);
     pm_qos_active = true;
     pr_info("inaho: PM QoS latency locked to %dus\n", PM_QOS_LATENCY_US);
 }
@@ -245,7 +244,7 @@ static void __exit inaho_audio_enhance_exit(void)
     kthread_stop(inaho_thread);
 
     if (pm_qos_active) {
-        pm_qos_remove_request(&inaho_pm_qos);
+        cpu_latency_qos_remove_request(&inaho_pm_qos);
         pm_qos_active = false;
     }
 
@@ -257,4 +256,4 @@ module_exit(inaho_audio_enhance_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Inaho Audio Enhance — SCHED_FIFO + PM QoS + CPUSet tuning");
+MODULE_DESCRIPTION("OCHINAI INAHO AUDIO — SCHED_FIFO + PM QoS + CPUSet tuning");
