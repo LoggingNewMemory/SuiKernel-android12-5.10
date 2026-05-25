@@ -486,6 +486,14 @@ config HISI_HIKEY_USB
 	  switching between the dual-role USB-C port and the USB-A host ports
 	  using only one USB controller.
 
+config OCHINAI_INAHO_AUDIO
+    tristate "Ochinai Inaho Audio — SCHED_FIFO + PM QoS + CPUSet tuning"
+    depends on CPU_FREQ && SCHED_DEBUG
+    help
+      Boosts audio threads to SCHED_FIFO priority, locks CPU latency
+      via PM QoS, and expands CPUSet for audio processes to include
+      all cores. Author: Kanagawa Yamada. Say Y or M.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
