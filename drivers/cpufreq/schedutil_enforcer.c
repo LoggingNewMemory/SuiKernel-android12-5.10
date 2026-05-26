@@ -9,13 +9,11 @@
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/cpufreq.h>
+#include <linux/string.h>
 #include <linux/raco_override.h>  /* Raco API header */
 
 #define ENFORCER_DELAY_MS 25000   /* Wake up right as vendor services deploy */
 #define ENFORCER_SCAN_MS  5000
-
-/* Declare the native kernel schedutil governor struct directly */
-extern struct cpufreq_governor cpufreq_gov_schedutil;
 
 static struct task_struct *enforcer_thread;
 
@@ -29,8 +27,21 @@ static void enforce_schedutil_governor(void)
 {
     unsigned int cpu;
     struct cpufreq_policy *policy;
+    struct cpufreq_governor *default_gov;
 
-    /* Loop through every logical CPU core on the device */
+    /* 1. Natively query the verified default scheduler governor structure pointer */
+    default_gov = cpufreq_default_governor();
+    if (!default_gov) {
+        pr_err("schedutil_enforcer: Default governor structure is unavailable!\n");
+        return;
+    }
+
+    /* Double check to ensure the default governor is indeed schedutil */
+    if (strncmp(default_gov->name, "schedutil", 9) != 0) {
+        pr_warn("schedutil_enforcer: Warning: Default governor is '%s', not stock schedutil.\n", default_gov->name);
+    }
+
+    /* 2. Loop through every logical CPU core on the device */
     for_each_possible_cpu(cpu) {
         policy = cpufreq_cpu_get(cpu);
         if (!policy)
@@ -41,28 +52,27 @@ static void enforce_schedutil_governor(void)
             pr_info("schedutil_enforcer: Caught rogue governor '%s' on CPU %d! Purging...\n", 
                     policy->governor->name, cpu);
 
-            /* Acquire the internal policy mutex to prevent race conditions or crashes */
+            /* Acquire the internal policy mutex lock safely as defined in cpufreq.h */
             down_write(&policy->rwsem);
 
-            /*
-            Directly swap the governor structure pointer with the stock 
-            kernel 'cpufreq_gov_schedutil' instance inside RAM memory!
+            /* 🪄 THE STRUCT INJECTION:
+             * Directly override the target governor slot with the verified default structural object
              */
-            policy->governor = &cpufreq_gov_schedutil;
+            policy->governor = default_gov;
             
-            /* Re-initialize the governor sub-slots for this specific core policy */
+            /* Re-initialize the native governor handlers if present */
             if (policy->governor->init)
                 policy->governor->init(policy);
 
             up_write(&policy->rwsem);
             
-            /* Trigger an asynchronous policy update event to refresh frequencies */
+            /* Trigger an asynchronous policy update to recalculate frequency mappings */
             cpufreq_update_policy(cpu);
             
-            pr_info("schedutil_enforcer: Successfully injected stock 'schedutil' structure pointer on CPU %d!\n", cpu);
+            pr_info("schedutil_enforcer: Successfully enforced default governor pointer on CPU %d!\n", cpu);
         }
         
-        /* Always release the cpufreq reference counter to avoid kernel memory leaks */
+        /* Always release the cpufreq reference counter to prevent memory tracking leaks */
         cpufreq_cpu_put(policy);
     }
 }
