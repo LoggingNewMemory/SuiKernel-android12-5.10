@@ -8,38 +8,19 @@
 #include <linux/init.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
-#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/raco_override.h>  /* Raco API header */
 
 #define ENFORCER_DELAY_MS 25000   /* Wake up right as vendor services deploy */
 #define ENFORCER_SCAN_MS  5000
 
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+/* Declare the native kernel schedutil governor struct directly */
+extern struct cpufreq_governor cpufreq_gov_schedutil;
 
 static struct task_struct *enforcer_thread;
 
 /* Control variable registered to Raco API */
 static int raco_governor_trigger = 0;
-
-/* Internal helper to safely write configurations to the Virtual File System */
-static int enforcer_write_file(const char *path, const char *buf)
-{
-    struct file *f;
-    loff_t pos = 0;
-    int ret;
-
-    f = filp_open(path, O_WRONLY, 0);
-    if (IS_ERR(f))
-        return PTR_ERR(f);
-
-    ret = kernel_write(f, buf, strlen(buf), &pos);
-    filp_close(f, NULL);
-
-    return ret < 0 ? ret : 0;
-}
 
 /* ------------------------------------------------------------------ */
 /* Core Governor Enforcement Engine                                    */
@@ -48,7 +29,6 @@ static void enforce_schedutil_governor(void)
 {
     unsigned int cpu;
     struct cpufreq_policy *policy;
-    char path[64];
 
     /* Loop through every logical CPU core on the device */
     for_each_possible_cpu(cpu) {
@@ -56,20 +36,30 @@ static void enforce_schedutil_governor(void)
         if (!policy)
             continue;
 
-        /* Check if the policy is currently active and not already running stock schedutil */
+        /* Check if the policy is currently active and running a rogue governor */
         if (policy->governor && strncmp(policy->governor->name, "schedutil", 9) != 0) {
             pr_info("schedutil_enforcer: Caught rogue governor '%s' on CPU %d! Purging...\n", 
                     policy->governor->name, cpu);
 
-            /* Generate path dynamically for each CPU policy node block */
-            snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", cpu);
+            /* Acquire the internal policy mutex to prevent race conditions or crashes */
+            down_write(&policy->rwsem);
 
-            /* Safely force standard 'schedutil' using our VFS helper system */
-            if (enforcer_write_file(path, "schedutil") == 0) {
-                pr_info("schedutil_enforcer: Successfully enforced standard 'schedutil' on CPU %d!\n", cpu);
-            } else {
-                pr_err("schedutil_enforcer: Failed to enforce governor on CPU %d\n", cpu);
-            }
+            /*
+            Directly swap the governor structure pointer with the stock 
+            kernel 'cpufreq_gov_schedutil' instance inside RAM memory!
+             */
+            policy->governor = &cpufreq_gov_schedutil;
+            
+            /* Re-initialize the governor sub-slots for this specific core policy */
+            if (policy->governor->init)
+                policy->governor->init(policy);
+
+            up_write(&policy->rwsem);
+            
+            /* Trigger an asynchronous policy update event to refresh frequencies */
+            cpufreq_update_policy(cpu);
+            
+            pr_info("schedutil_enforcer: Successfully injected stock 'schedutil' structure pointer on CPU %d!\n", cpu);
         }
         
         /* Always release the cpufreq reference counter to avoid kernel memory leaks */
