@@ -266,6 +266,15 @@ config YAMADA_TENEBRION
       restores full range on resume.
       Author: Kanagawa Yamada. Say Y or M.
 
+config SCHEDUTIL_ENFORCER
+	tristate "Enforce Schedutil as Default Governor"
+	depends on CPU_FREQ_DEFAULT_GOV_SCHEDUTIL && RACO_RC_OVERRIDE
+	help
+	 This have to be done because some init on vendor sets the Governor
+	 to sugov_ext (Which actually kinda same with schedutil). But because
+	 my eye I don't want to see it. Feel free to use this as reference if
+	 you want to change the governor with your own choice. Say Y or N
+
 if X86
 source "drivers/cpufreq/Kconfig.x86"
 endif

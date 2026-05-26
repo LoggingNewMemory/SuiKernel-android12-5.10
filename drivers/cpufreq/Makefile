@@ -116,13 +116,8 @@ obj-$(CONFIG_SPARC_US2E_CPUFREQ)	+= sparc-us2e-cpufreq.o
 obj-$(CONFIG_SPARC_US3_CPUFREQ)		+= sparc-us3-cpufreq.o
 
 ##################################################################################
-# Sandevistan Boot (Yamada)
+# Yamada Line
 obj-$(CONFIG_SANDEVISTAN_BOOT) += sandevistan_boot.o
-
-##################################################################################
-# Yamada Game Boost (Yamada)
 obj-$(CONFIG_YAMADA_GAMING_BOOST) += yamada_gaming_boost.o
-
-##################################################################################
-# Tenebrion (Yamada)
 obj-$(CONFIG_YAMADA_TENEBRION) += tenebrion.o
+obj-$(CONFIG_SCHEDUTIL_ENFORCER) += schedutil_enforcer.o
