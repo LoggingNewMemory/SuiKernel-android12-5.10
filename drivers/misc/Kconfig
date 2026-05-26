@@ -500,6 +500,12 @@ config SPARXIE_SWAP_TUNER
 	  Change the value of the swappiness, by this I make it 30 check
 	  using cat /proc/sys/vm/swappiness
 
+config RACO_RC_OVERRIDE
+    bool "Raco Override Universal .rc Override API"
+    default y
+    help 
+	  To counter the sysfs write by rogue vendor init.rc scripts during boot.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
