@@ -27,27 +27,6 @@ struct raco_target {
 static LIST_HEAD(raco_target_list);
 static struct task_struct *raco_thread;
 
-int raco_register_rc_override(int *target_ptr, int desired_val, const char *name)
-{
-    struct raco_target *new_target;
-
-    new_target = kmalloc(sizeof(struct raco_target), GFP_KERNEL);
-    if (!new_target) {
-        pr_err("raco_override: Failed to allocate memory for %s\n", name);
-        return -ENOMEM;
-    }
-
-    new_target->kernel_val_ptr = target_ptr;
-    new_target->target_val = desired_val;
-    new_target->name = name;
-
-    list_add_tail(&new_target->list, &raco_target_list);
-    
-    pr_info("raco_override: Registered [%s] -> %d (Infinite List)\n", name, desired_val);
-    return 0;
-}
-EXPORT_SYMBOL(raco_register_rc_override);
-
 static int raco_sniper_thread(void *data)
 {
     int retries = 24; 
@@ -75,23 +54,46 @@ static int raco_sniper_thread(void *data)
     }
 
     pr_info("raco_override: Global Sniper mission complete. List cleaned up.\n");
+    raco_thread = NULL;
     return 0;
 }
+
+int raco_register_rc_override(int *target_ptr, int desired_val, const char *name)
+{
+    struct raco_target *new_target;
+
+    new_target = kmalloc(sizeof(struct raco_target), GFP_KERNEL);
+    if (!new_target) {
+        pr_err("raco_override: Failed to allocate memory for %s\n", name);
+        return -ENOMEM;
+    }
+
+    new_target->kernel_val_ptr = target_ptr;
+    new_target->target_val = desired_val;
+    new_target->name = name;
+
+    list_add_tail(&new_target->list, &raco_target_list);
+    pr_info("raco_override: Registered [%s] -> %d\n", name, desired_val);
+
+    if (!raco_thread) {
+        raco_thread = kthread_run(raco_sniper_thread, NULL, "raco_sniper");
+        if (IS_ERR(raco_thread)) {
+            pr_err("raco_override: Failed to deploy Raco Sniper on demand\n");
+            raco_thread = NULL;
+        } else {
+            pr_info("raco_override: Global Sniper deployed dynamically via registration!\n");
+        }
+    }
+
+    return 0;
+}
+EXPORT_SYMBOL(raco_register_rc_override);
 
 static int __init raco_override_init(void)
 {
-    if (!list_empty(&raco_target_list)) {
-        raco_thread = kthread_run(raco_sniper_thread, NULL, "raco_sniper");
-        if (IS_ERR(raco_thread)) {
-            pr_err("raco_override: Failed to deploy Raco Sniper\n");
-            return PTR_ERR(raco_thread);
-        }
-    } else {
-        pr_info("raco_override: No targets registered. Engine sleeping.\n");
-    }
+    pr_info("raco_override: Framework core initialized. Waiting for registrations...\n");
     return 0;
 }
-
 late_initcall(raco_override_init);
 
 MODULE_LICENSE("GPL v2");
