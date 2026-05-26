@@ -409,15 +409,7 @@ static int tenebrion_watcher(void *data)
 static int __init tenebrion_init(void)
 {
     memset(qos_initialized, 0, sizeof(qos_initialized));
-
-    /*
-     * Try path detection early. If it fails here it may just be a
-     * timing issue (display driver not probed yet), so we leave the
-     * watcher to do one final retry after the 40 s boot delay.
-     * PATH_UNSUPPORTED is only set permanently by tenebrion_detect_path()
-     * when both paths are unreachable.
-     */
-    active_path = tenebrion_detect_path();
+    active_path = PATH_NONE;
 
     watcher_thread = kthread_run(tenebrion_watcher, NULL, "tenebrion");
     if (IS_ERR(watcher_thread)) {
