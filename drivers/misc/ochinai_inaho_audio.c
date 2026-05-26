@@ -1,6 +1,6 @@
 // ochinai_inaho_audio.c
 // SPDX-License-Identifier: GPL-2.0-only
-// Ochinai Inaho Audio — SCHED_FIFO boost + PM QoS + CPUSet tuning
+// Ochinai Inaho Audio — SCHED_FIFO boost + PM QoS + Raco CPUSet API Integration
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
@@ -16,6 +16,7 @@
 #include <linux/cpu.h>
 #include <linux/rcupdate.h>
 #include <uapi/linux/sched/types.h>
+#include <linux/raco_override.h>  /* Raco Core API Header */
 
 #define ENGAGE_DELAY_MS     20000
 #define AUDIO_SCAN_MS       5000
@@ -33,9 +34,9 @@ static bool pm_qos_active = false;
 
 static struct task_struct *inaho_thread;
 
-/* ------------------------------------------------------------------ */
-/* Audio process names to boost                                         */
-/* ------------------------------------------------------------------ */
+/* Control variable registered to Raco API */
+static int raco_cpuset_trigger = 0; 
+static char dynamic_cpu_mask[16];
 
 static const char * const audio_threads[] = {
     "audioserver",
@@ -51,10 +52,7 @@ static const char * const audio_threads[] = {
     NULL
 };
 
-/* ------------------------------------------------------------------ */
-/* File helpers                                                         */
-/* ------------------------------------------------------------------ */
-
+/* Internal helper to safely write cpuset configs to the Virtual File System */
 static int inaho_write_file(const char *path, const char *buf)
 {
     struct file *f;
@@ -71,31 +69,32 @@ static int inaho_write_file(const char *path, const char *buf)
     return ret < 0 ? ret : 0;
 }
 
-static int inaho_read_file(const char *path, char *buf, size_t size)
+/* ------------------------------------------------------------------ */
+/* Dynamic CPUSet Allocator (Supports Any Core Count / Infinite Cores)*/
+/* ------------------------------------------------------------------ */
+static void inaho_execute_cpuset_override(void)
 {
-    struct file *f;
-    loff_t pos = 0;
-    int ret;
+    int total_cores = num_possible_cpus(); /* Dynamically fetch true hardware core count */
+    
+    /* Format string dynamically: e.g., 8 cores -> "0-7", 12 cores -> "0-11" */
+    snprintf(dynamic_cpu_mask, sizeof(dynamic_cpu_mask), "0-%d", total_cores - 1);
 
-    f = filp_open(path, O_RDONLY, 0);
-    if (IS_ERR(f))
-        return -1;
+    pr_info("inaho: Dynamic core range detected: %s\n", dynamic_cpu_mask);
 
-    ret = kernel_read(f, buf, size - 1, &pos);
-    filp_close(f, NULL);
+    /* Enforce maximum performance allocations across all Android cpusets */
+    if (inaho_write_file("/dev/cpuset/foreground/cpus", dynamic_cpu_mask) == 0)
+        pr_info("inaho: foreground cpuset locked to %s\n", dynamic_cpu_mask);
 
-    if (ret > 0)
-        buf[ret] = '\0';
-    else
-        ret = -1;
+    if (inaho_write_file("/dev/cpuset/top-app/cpus", dynamic_cpu_mask) == 0)
+        pr_info("inaho: top-app cpuset locked to %s\n", dynamic_cpu_mask);
 
-    return ret;
+    if (inaho_write_file("/dev/cpuset/boost-app/cpus", dynamic_cpu_mask) == 0)
+        pr_info("inaho: boost-app cpuset locked to %s\n", dynamic_cpu_mask);
 }
 
 /* ------------------------------------------------------------------ */
-/* Feature 1 — SCHED_FIFO boost for audio threads                      */
+/* Feature 1 — SCHED_FIFO boost for critical audio threads            */
 /* ------------------------------------------------------------------ */
-
 static void inaho_boost_audio_threads(void)
 {
     struct task_struct *p;
@@ -106,14 +105,10 @@ static void inaho_boost_audio_threads(void)
     rcu_read_lock();
     for_each_process(p) {
         for (i = 0; audio_threads[i]; i++) {
-            if (strncmp(p->comm, audio_threads[i],
-                        TASK_COMM_LEN) == 0) {
-                /* Only boost if not already RT */
+            if (strncmp(p->comm, audio_threads[i], TASK_COMM_LEN) == 0) {
                 if (!rt_task(p)) {
-                    sched_setscheduler_nocheck(p,
-                        SCHED_FIFO, &param);
-                    pr_info("inaho: boosted %s (pid %d) → SCHED_FIFO\n",
-                            p->comm, p->pid);
+                    sched_setscheduler_nocheck(p, SCHED_FIFO, &param);
+                    pr_info("inaho: boosted %s (pid %d) → SCHED_FIFO\n", p->comm, p->pid);
                     boosted++;
                 }
                 break;
@@ -125,10 +120,6 @@ static void inaho_boost_audio_threads(void)
     pr_info("inaho: %d audio threads boosted to SCHED_FIFO\n", boosted);
 }
 
-/* ------------------------------------------------------------------ */
-/* Feature 2 — PM QoS latency lock                                     */
-/* ------------------------------------------------------------------ */
-
 static void inaho_pm_qos_engage(void)
 {
     if (pm_qos_active)
@@ -139,87 +130,36 @@ static void inaho_pm_qos_engage(void)
     pr_info("inaho: PM QoS latency locked to %dus\n", PM_QOS_LATENCY_US);
 }
 
-/* ------------------------------------------------------------------ */
-/* Feature 3 — CPUSet tuning                                           */
-/* ------------------------------------------------------------------ */
-
-static void inaho_cpuset_tune(void)
-{
-    char buf[32];
-    int ret;
-
-    /* Expand foreground cpuset to include cpu7 (big core) */
-    ret = inaho_read_file("/dev/cpuset/foreground/cpus", buf, sizeof(buf));
-    if (ret > 0) {
-        if (strstr(buf, "0-7")) {
-            pr_info("inaho: foreground cpuset already 0-7\n");
-        } else {
-            ret = inaho_write_file("/dev/cpuset/foreground/cpus", "0-7");
-            if (ret < 0)
-                pr_warn("inaho: foreground cpuset expand failed (%d)\n", ret);
-            else
-                pr_info("inaho: foreground cpuset expanded to 0-7\n");
-        }
-    }
-
-    /* Expand top-app to all CPUs — already 0-7 on this device but
-       write anyway to handle devices where it might be restricted */
-    ret = inaho_read_file("/dev/cpuset/top-app/cpus", buf, sizeof(buf));
-    if (ret > 0) {
-        if (!strstr(buf, "0-7")) {
-            ret = inaho_write_file("/dev/cpuset/top-app/cpus", "0-7");
-            if (ret < 0)
-                pr_warn("inaho: top-app cpuset expand failed (%d)\n", ret);
-            else
-                pr_info("inaho: top-app cpuset expanded to 0-7\n");
-        } else {
-            pr_info("inaho: top-app cpuset already 0-7\n");
-        }
-    }
-
-    /* Expand boost-app to all CPUs */
-    ret = inaho_read_file("/dev/cpuset/boost-app/cpus", buf, sizeof(buf));
-    if (ret > 0) {
-        if (!strstr(buf, "0-7")) {
-            ret = inaho_write_file("/dev/cpuset/boost-app/cpus", "0-7");
-            if (ret < 0)
-                pr_warn("inaho: boost-app cpuset expand failed (%d)\n", ret);
-            else
-                pr_info("inaho: boost-app cpuset expanded to 0-7\n");
-        } else {
-            pr_info("inaho: boost-app cpuset already 0-7\n");
-        }
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* Periodic audio thread scanner                                        */
-/* Rescans every AUDIO_SCAN_MS to catch newly spawned audio threads    */
-/* ------------------------------------------------------------------ */
-
 static int inaho_worker(void *data)
 {
     pr_info("inaho: standing by — engaging in %dms\n", ENGAGE_DELAY_MS);
-
-    /* Wait for SELinux + KernelSU rules */
     msleep(ENGAGE_DELAY_MS);
 
-    /* One-shot: PM QoS + CPUSet */
     inaho_pm_qos_engage();
-    inaho_cpuset_tune();
 
-    /* Periodic: rescan audio threads */
+    /* Initial enforcement right after boot completion delay */
+    inaho_execute_cpuset_override();
+
     while (!kthread_should_stop()) {
         inaho_boost_audio_threads();
+        
+        /* * THE INVERSE HIJACK:
+         * Every 5 seconds, if Raco Sniper reset our trigger back to 1,
+         * it means Raco Sniper is actively executing its guard loop.
+         * We catch that signal, re-enforce the cpuset to overwrite vendor, 
+         * and drop it back to 0 so Raco Sniper catches it again next cycle!
+         */
+        if (raco_cpuset_trigger == 1) {
+            pr_info("inaho: Raco Core pulse detected! Re-enforcing CPUSet guards against vendor.\n");
+            inaho_execute_cpuset_override();
+            raco_cpuset_trigger = 0; /* Arm the snare again for Raco Sniper */
+        }
+
         msleep_interruptible(AUDIO_SCAN_MS);
     }
 
     return 0;
 }
-
-/* ------------------------------------------------------------------ */
-/* Init / Exit                                                          */
-/* ------------------------------------------------------------------ */
 
 static int __init inaho_audio_enhance_init(void)
 {
@@ -228,10 +168,17 @@ static int __init inaho_audio_enhance_init(void)
         return 0;
     }
 
+    /* * Register to Raco API: Desired value is 1. 
+     * Since we initialized it at 0, Raco Sniper will constantly write '1' to it 
+     * every 5 seconds for the next 2 minutes, passing a pulse execution token to us!
+     */
+    if (raco_register_rc_override(&raco_cpuset_trigger, 1, "audio.cpuset_lock") == 0) {
+        pr_info("inaho: CPUSet automation hooked to Raco Global Sniper API\n");
+    }
+
     inaho_thread = kthread_run(inaho_worker, NULL, "inaho_audio");
     if (IS_ERR(inaho_thread)) {
-        pr_err("inaho: failed to start thread: %ld\n",
-               PTR_ERR(inaho_thread));
+        pr_err("inaho: failed to start thread: %ld\n", PTR_ERR(inaho_thread));
         return PTR_ERR(inaho_thread);
     }
 
@@ -241,7 +188,8 @@ static int __init inaho_audio_enhance_init(void)
 
 static void __exit inaho_audio_enhance_exit(void)
 {
-    kthread_stop(inaho_thread);
+    if (inaho_thread)
+        kthread_stop(inaho_thread);
 
     if (pm_qos_active) {
         cpu_latency_qos_remove_request(&inaho_pm_qos);
@@ -256,4 +204,4 @@ module_exit(inaho_audio_enhance_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("OCHINAI INAHO AUDIO — SCHED_FIFO + PM QoS + CPUSet tuning");
+MODULE_DESCRIPTION("OCHINAI INAHO AUDIO — Raco API + Infinite Cores Support");
