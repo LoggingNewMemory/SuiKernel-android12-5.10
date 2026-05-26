@@ -15,6 +15,7 @@
 #include <linux/pm_qos.h>
 #include <linux/cpu.h>
 #include <linux/rcupdate.h>
+#include <linux/string.h>      
 #include <uapi/linux/sched/types.h>
 #include <linux/raco_override.h>  /* Raco Core API Header */
 
@@ -117,7 +118,10 @@ static void inaho_boost_audio_threads(void)
     }
     rcu_read_unlock();
 
-    pr_info("inaho: %d audio threads boosted to SCHED_FIFO\n", boosted);
+    // Only log to dmesg if we actually boosted new active threads!
+    if (boosted > 0) {
+        pr_info("inaho: %d audio threads boosted to SCHED_FIFO\n", boosted);
+    }
 }
 
 static void inaho_pm_qos_engage(void)
@@ -143,16 +147,29 @@ static int inaho_worker(void *data)
     while (!kthread_should_stop()) {
         inaho_boost_audio_threads();
         
-        /* * THE INVERSE HIJACK:
-         * Every 5 seconds, if Raco Sniper reset our trigger back to 1,
-         * it means Raco Sniper is actively executing its guard loop.
-         * We catch that signal, re-enforce the cpuset to overwrite vendor, 
-         * and drop it back to 0 so Raco Sniper catches it again next cycle!
-         */
         if (raco_cpuset_trigger == 1) {
-            pr_info("inaho: Raco Core pulse detected! Re-enforcing CPUSet guards against vendor.\n");
+            pr_info("inaho: Raco Core pulse detected! Re-enforcing CPUSet guards.\n");
             inaho_execute_cpuset_override();
-            raco_cpuset_trigger = 0; /* Arm the snare again for Raco Sniper */
+            raco_cpuset_trigger = 0;
+        } else {
+            /* Emergency validation watchdog check */
+            struct file *f = filp_open("/dev/cpuset/foreground/cpus", O_RDONLY, 0);
+            if (!IS_ERR(f)) {
+                char current_mask[16] = {0};
+                char *cleaned_mask;
+                loff_t pos = 0;
+                
+                kernel_read(f, current_mask, sizeof(current_mask) - 1, &pos);
+                filp_close(f, NULL);
+                
+                /* FIX: Clean trailing whitespaces/newlines using kernel's native strim() */
+                cleaned_mask = strim(current_mask);
+                
+                if (strstr(cleaned_mask, dynamic_cpu_mask) == NULL) {
+                    pr_info("inaho: Detected sneaky vendor rollback on foreground (%s)! Re-allocating all cores.\n", cleaned_mask);
+                    inaho_execute_cpuset_override();
+                }
+            }
         }
 
         msleep_interruptible(AUDIO_SCAN_MS);
@@ -168,10 +185,7 @@ static int __init inaho_audio_enhance_init(void)
         return 0;
     }
 
-    /* * Register to Raco API: Desired value is 1. 
-     * Since we initialized it at 0, Raco Sniper will constantly write '1' to it 
-     * every 5 seconds for the next 2 minutes, passing a pulse execution token to us!
-     */
+    /* Register to Raco API */
     if (raco_register_rc_override(&raco_cpuset_trigger, 1, "audio.cpuset_lock") == 0) {
         pr_info("inaho: CPUSet automation hooked to Raco Global Sniper API\n");
     }
