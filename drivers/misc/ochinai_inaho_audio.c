@@ -118,7 +118,10 @@ static void inaho_boost_audio_threads(void)
     }
     rcu_read_unlock();
 
-    pr_info("inaho: %d audio threads boosted to SCHED_FIFO\n", boosted);
+    // Only log to dmesg if we actually boosted new active threads!
+    if (boosted > 0) {
+        pr_info("inaho: %d audio threads boosted to SCHED_FIFO\n", boosted);
+    }
 }
 
 static void inaho_pm_qos_engage(void)
