@@ -34,6 +34,7 @@ static int raco_sniper_thread(void *data)
 {
     int retries = 24; 
     struct raco_target *entry;
+    struct raco_target *tmp;
 
     pr_info("raco_override: Global Sniper deployed in shadow lines...\n");
 
@@ -50,7 +51,7 @@ static int raco_sniper_thread(void *data)
         retries--;
     }
 
-    struct raco_target *tmp;
+    /* Clean up loop uses the cleanly initialized tmp pointer up top */
     list_for_each_entry_safe(entry, tmp, &raco_target_list, list) {
         list_del(&entry->list);
         kfree(entry);
