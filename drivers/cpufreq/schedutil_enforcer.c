@@ -8,16 +8,38 @@
 #include <linux/init.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
+#include <linux/fs.h>
+#include <linux/slab.h>
+#include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/raco_override.h>  /* Raco API header */
 
 #define ENFORCER_DELAY_MS 25000   /* Wake up right as vendor services deploy */
 #define ENFORCER_SCAN_MS  5000
 
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+
 static struct task_struct *enforcer_thread;
 
 /* Control variable registered to Raco API */
 static int raco_governor_trigger = 0;
+
+/* Internal helper to safely write configurations to the Virtual File System */
+static int enforcer_write_file(const char *path, const char *buf)
+{
+    struct file *f;
+    loff_t pos = 0;
+    int ret;
+
+    f = filp_open(path, O_WRONLY, 0);
+    if (IS_ERR(f))
+        return PTR_ERR(f);
+
+    ret = kernel_write(f, buf, strlen(buf), &pos);
+    filp_close(f, NULL);
+
+    return ret < 0 ? ret : 0;
+}
 
 /* ------------------------------------------------------------------ */
 /* Core Governor Enforcement Engine                                    */
@@ -26,7 +48,7 @@ static void enforce_schedutil_governor(void)
 {
     unsigned int cpu;
     struct cpufreq_policy *policy;
-    struct cpufreq_user_policy new_user_policy;
+    char path[64];
 
     /* Loop through every logical CPU core on the device */
     for_each_possible_cpu(cpu) {
@@ -39,15 +61,14 @@ static void enforce_schedutil_governor(void)
             pr_info("schedutil_enforcer: Caught rogue governor '%s' on CPU %d! Purging...\n", 
                     policy->governor->name, cpu);
 
-            /* Prepare the strict policy override structure */
-            memcpy(&new_user_policy, &policy->user_policy, sizeof(struct cpufreq_user_policy));
-            strscpy(new_user_policy.governor, "schedutil", CPUFREQ_NAME_LEN);
+            /* Generate path dynamically for each CPU policy node block */
+            snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", cpu);
 
-            /* Safely modify the policy using the official kernel cpufreq API */
-            if (cpufreq_modify_policy(policy, &new_user_policy) == 0) {
+            /* Safely force standard 'schedutil' using our VFS helper system */
+            if (enforcer_write_file(path, "schedutil") == 0) {
                 pr_info("schedutil_enforcer: Successfully enforced standard 'schedutil' on CPU %d!\n", cpu);
             } else {
-                pr_err("schedutil_enforcer: Failed to enforce policy change on CPU %d\n", cpu);
+                pr_err("schedutil_enforcer: Failed to enforce governor on CPU %d\n", cpu);
             }
         }
         
@@ -65,8 +86,7 @@ static int enforcer_worker(void *data)
     enforce_schedutil_governor();
 
     while (!kthread_should_stop()) {
-        /* 
-         If Raco Sniper resets our trigger back to 1, it means a boot-time
+        /* If Raco Sniper resets our trigger back to 1, it means a boot-time
          vendor script tried to hijack our system layout. We catch the signal,
          force our clean schedutil layout back on, and reset it to 0!
          */
