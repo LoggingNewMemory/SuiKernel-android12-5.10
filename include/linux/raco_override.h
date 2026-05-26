@@ -1,11 +1,18 @@
-// include/linux/raco_override.h
-// SPDX-License-Identifier: GPL-2.0-only
-// Author: Kanagawa Yamada
-// This to make a better implementation since in the future I will need a lot of init override method
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * include/linux/raco_override.h
+ * Raco Universal RC Override API — public header
+ * Author: Kanagawa Yamada
+ */
 
 #ifndef _RACO_RC_OVERRIDE_H
 #define _RACO_RC_OVERRIDE_H
 
-int raco_register_rc_override(int *target_ptr, int desired_val, const char *name);
+#include <linux/atomic.h>
 
-#endif
+int raco_register_rc_override(atomic_t *target_ptr, int desired_val,
+			      const char *name);
+
+int raco_unregister_rc_override(atomic_t *target_ptr);
+
+#endif /* _RACO_RC_OVERRIDE_H */
