@@ -15,6 +15,9 @@
 /*
 I use linked list to handle multiple files, I know that
 One day I might ran out of spaces and I probably will forgot about this XD
+
+To use: Simply you can do raco_register_rc_override. See the
+drivers/misc/sparxie_swapiness_tuner.c for example (Simplest usage)
 */
 
 struct raco_target {
