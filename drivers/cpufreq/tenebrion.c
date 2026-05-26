@@ -47,13 +47,6 @@ static struct freq_qos_request tenebrion_min_req[NR_CPUS];
 static struct freq_qos_request tenebrion_max_req[NR_CPUS];
 static bool qos_initialized[NR_CPUS];
 
-/*
- * Saved cpuset strings so we can restore the exact original values
- * on screen-on rather than guessing what they were.
- */
-static char saved_bg_cpus[32];
-static char saved_sysbg_cpus[32];
-
 /* ------------------------------------------------------------------ */
 /* File helpers                                                         */
 /* ------------------------------------------------------------------ */
@@ -174,35 +167,26 @@ static int tenebrion_get_screen_state(void)
 
 static void tenebrion_cpuset_restrict(void)
 {
-    /* Save current values before overwriting */
-    if (tenebrion_read_file(CPUSET_BG_PATH,
-                            saved_bg_cpus,
-                            sizeof(saved_bg_cpus)) < 0)
-        strlcpy(saved_bg_cpus, "0", sizeof(saved_bg_cpus));
-
-    if (tenebrion_read_file(CPUSET_SYSBG_PATH,
-                            saved_sysbg_cpus,
-                            sizeof(saved_sysbg_cpus)) < 0)
-        strlcpy(saved_sysbg_cpus, "0", sizeof(saved_sysbg_cpus));
-
     if (tenebrion_write_file(CPUSET_BG_PATH, CPUSET_SCREEN_OFF) == 0)
-        pr_info("tenebrion: background cpuset → %s (was: %s)\n",
-                CPUSET_SCREEN_OFF, saved_bg_cpus);
+        pr_info("tenebrion: background cpuset → %s\n", CPUSET_SCREEN_OFF);
 
     if (tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF) == 0)
-        pr_info("tenebrion: system-background cpuset → %s (was: %s)\n",
-                CPUSET_SCREEN_OFF, saved_sysbg_cpus);
+        pr_info("tenebrion: system-background cpuset → %s\n", CPUSET_SCREEN_OFF);
 }
 
 static void tenebrion_cpuset_restore(void)
 {
-    if (tenebrion_write_file(CPUSET_BG_PATH, saved_bg_cpus) == 0)
-        pr_info("tenebrion: background cpuset restored → %s\n",
-                saved_bg_cpus);
+    char dynamic_cpu_mask[32];
+    int total_cores = num_possible_cpus();
 
-    if (tenebrion_write_file(CPUSET_SYSBG_PATH, saved_sysbg_cpus) == 0)
-        pr_info("tenebrion: system-background cpuset restored → %s\n",
-                saved_sysbg_cpus);
+    /* Forge the dynamic mask (e.g., "0-7" for an 8-core SoC) */
+    snprintf(dynamic_cpu_mask, sizeof(dynamic_cpu_mask), "0-%d", total_cores - 1);
+
+    if (tenebrion_write_file(CPUSET_BG_PATH, dynamic_cpu_mask) == 0)
+        pr_info("tenebrion: background cpuset restored → %s\n", dynamic_cpu_mask);
+
+    if (tenebrion_write_file(CPUSET_SYSBG_PATH, dynamic_cpu_mask) == 0)
+        pr_info("tenebrion: system-background cpuset restored → %s\n", dynamic_cpu_mask);
 }
 
 /* ------------------------------------------------------------------ */
