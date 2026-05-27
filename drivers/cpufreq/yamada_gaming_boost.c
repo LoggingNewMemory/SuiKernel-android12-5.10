@@ -11,7 +11,7 @@
 #include <linux/spinlock.h>
 #include <linux/input.h>
 
-#define BOOST_DURATION_MS   500
+#define BOOST_DURATION_MS   1000
 
 static bool yamada_boost_enabled = true;
 module_param(yamada_boost_enabled, bool, 0644);
