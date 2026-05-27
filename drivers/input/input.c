@@ -30,6 +30,10 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input core");
 MODULE_LICENSE("GPL");
 
+// Yamada Game Boost Line
+void (*yamada_boost_hook)(void) = NULL;
+EXPORT_SYMBOL(yamada_boost_hook);
+
 #define INPUT_MAX_CHAR_DEVICES		1024
 #define INPUT_FIRST_DYNAMIC_DEV		256
 static DEFINE_IDA(input_ida);
@@ -141,6 +145,11 @@ static void input_pass_values(struct input_dev *dev,
 {
 	struct input_handle *handle;
 	struct input_value *v;
+
+	// Yamada Game Boost Line
+	if (yamada_boost_hook && test_bit(EV_ABS, dev->evbit)) {
+		yamada_boost_hook();
+	}
 
 	if (!count)
 		return;
