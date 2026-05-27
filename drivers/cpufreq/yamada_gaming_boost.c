@@ -203,14 +203,7 @@ static void yamada_input_disconnect(struct input_handle *handle)
 }
 
 static const struct input_device_id yamada_input_ids[] = {
-    {
-        .flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-        .evbit = { BIT_MASK(EV_ABS) },
-    },
-    {
-        .flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-        .evbit = { BIT_MASK(EV_KEY) },
-    },
+    { .driver_info = 1 },
     { },
 };
 MODULE_DEVICE_TABLE(input, yamada_input_ids);
