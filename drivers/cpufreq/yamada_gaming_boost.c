@@ -23,7 +23,7 @@ static bool is_boosted = false;
 static DEFINE_SPINLOCK(boost_lock);
 
 static struct freq_qos_request boost_min_req[NR_CPUS];
-static struct freq_qos_request boost_max_req[NR_CPUS]; /* Kobo tambahin penarik atapnya! 💦 */
+static struct freq_qos_request boost_max_req[NR_CPUS];
 static bool qos_initialized[NR_CPUS];
 
 static struct work_struct boost_on_work;
@@ -40,7 +40,6 @@ static void do_boost_on(struct work_struct *work) {
         policy = cpufreq_cpu_get(cpu);
         if (policy) {
             if (policy->cpu == cpu) {
-                /* JIT Initialization: Daftarin MAX dan MIN sekaligus pas pertama disentuh */
                 if (!qos_initialized[cpu]) {
                     freq_qos_add_request(&policy->constraints, &boost_min_req[cpu], FREQ_QOS_MIN, policy->cpuinfo.min_freq);
                     freq_qos_add_request(&policy->constraints, &boost_max_req[cpu], FREQ_QOS_MAX, policy->cpuinfo.max_freq);
@@ -71,7 +70,6 @@ static void do_boost_off(struct work_struct *work) {
         policy = cpufreq_cpu_get(cpu);
         if (policy) {
             if (policy->cpu == cpu) {
-                /* Turunin MIN dulu, baru biarin atapnya kembali normal */
                 freq_qos_update_request(&boost_min_req[cpu], policy->cpuinfo.min_freq);
                 freq_qos_update_request(&boost_max_req[cpu], policy->cpuinfo.max_freq);
             }
@@ -122,7 +120,7 @@ static int __init yamada_gaming_boost_init(void) {
 
     yamada_boost_hook = kobo_trigger_boost;
 
-    pr_info("yamada_gaming_boost: active — JIT PM QoS Roof Breaker Edition\n");
+    pr_info("yamada_gaming_boost: active\n");
     return 0;
 }
 
