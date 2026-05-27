@@ -29,8 +29,8 @@ extern void (*yamada_boost_hook)(void);
 
 static void set_policy_freqs(struct cpufreq_policy *policy, unsigned int min_freq, unsigned int max_freq)
 {
-    policy->user_policy.max = max_freq;
-    policy->user_policy.min = min_freq;
+    policy->max = max_freq;
+    policy->min = min_freq;
     cpufreq_update_policy(policy->cpu);
 }
 
