@@ -242,9 +242,14 @@ static void tenebrion_set_min_freq(void)
             continue;
 
         if (policy->cpu == cpu && qos_initialized[cpu]) {
-            freq_qos_update_request(&tenebrion_max_req[cpu],
-                                    policy->cpuinfo.min_freq);
+            /*
+             * Order matters: bring min_req DOWN first so the QoS
+             * arbiter never sees min > max during the transition,
+             * then clamp max_req down to min_freq.
+             */
             freq_qos_update_request(&tenebrion_min_req[cpu],
+                                    policy->cpuinfo.min_freq);
+            freq_qos_update_request(&tenebrion_max_req[cpu],
                                     policy->cpuinfo.min_freq);
 
             pr_info("tenebrion: policy%u → %u KHz (screen off)\n",
@@ -270,6 +275,11 @@ static void tenebrion_restore_freq(void)
             continue;
 
         if (policy->cpu == cpu && qos_initialized[cpu]) {
+            /*
+             * Order matters: raise the max_req ceiling first, then
+             * restore min_req floor.  Reversing this would momentarily
+             * set min > max on the QoS arbiter.
+             */
             freq_qos_update_request(&tenebrion_max_req[cpu],
                                     policy->cpuinfo.max_freq);
             freq_qos_update_request(&tenebrion_min_req[cpu],

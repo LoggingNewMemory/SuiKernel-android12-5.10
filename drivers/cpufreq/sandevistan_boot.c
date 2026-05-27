@@ -21,6 +21,7 @@ static struct delayed_work revert_work;
 
 /* QoS requests per policy CPU */
 static struct freq_qos_request sandevistan_min_req[NR_CPUS];
+static struct freq_qos_request sandevistan_max_req[NR_CPUS];
 static bool qos_initialized[NR_CPUS];
 
 static void do_boost(struct work_struct *work)
@@ -38,12 +39,24 @@ static void do_boost(struct work_struct *work)
 
         if (policy->cpu == cpu) {
             if (!qos_initialized[cpu]) {
+                /*
+                 * Add max_req first (sets ceiling), then min_req
+                 * (raises floor to meet it).  This avoids a transient
+                 * min > max state in the QoS arbiter.
+                 */
+                freq_qos_add_request(&policy->constraints,
+                                     &sandevistan_max_req[cpu],
+                                     FREQ_QOS_MAX,
+                                     policy->cpuinfo.max_freq);
                 freq_qos_add_request(&policy->constraints,
                                      &sandevistan_min_req[cpu],
                                      FREQ_QOS_MIN,
                                      policy->cpuinfo.max_freq);
                 qos_initialized[cpu] = true;
             } else {
+                /* Raise ceiling before floor */
+                freq_qos_update_request(&sandevistan_max_req[cpu],
+                                        policy->cpuinfo.max_freq);
                 freq_qos_update_request(&sandevistan_min_req[cpu],
                                         policy->cpuinfo.max_freq);
             }
@@ -73,8 +86,15 @@ static void do_revert(struct work_struct *work)
             continue;
 
         if (policy->cpu == cpu && qos_initialized[cpu]) {
+            /*
+             * Lower min_req floor first so it can never exceed the
+             * max_req value during the transition, then release the
+             * max_req ceiling lock back to hardware max.
+             */
             freq_qos_update_request(&sandevistan_min_req[cpu],
                                     policy->cpuinfo.min_freq);
+            freq_qos_update_request(&sandevistan_max_req[cpu],
+                                    policy->cpuinfo.max_freq);
 
             pr_info("sandevistan_boot: policy%u restored min=%u max=%u KHz\n",
                     cpu, policy->cpuinfo.min_freq, policy->cpuinfo.max_freq);
@@ -91,6 +111,7 @@ static void sandevistan_qos_cleanup(void)
     for_each_possible_cpu(cpu) {
         if (qos_initialized[cpu]) {
             freq_qos_remove_request(&sandevistan_min_req[cpu]);
+            freq_qos_remove_request(&sandevistan_max_req[cpu]);
             qos_initialized[cpu] = false;
         }
     }
