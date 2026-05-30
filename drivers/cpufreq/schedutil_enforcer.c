@@ -3,240 +3,121 @@
  * schedutil_enforcer.c
  * Enforce schedutil as the CPUFreq governor against vendor init.rc overrides.
  * Author: Kanagawa Yamada
+ *
+ * Design — why a policy notifier, not a kthread writing sysfs:
+ *
+ *   The exported cpufreq API available to out-of-tree modules on this kernel
+ *   (per cpufreq.h + EXPORT_SYMBOL grep of drivers/cpufreq/cpufreq.c) is:
+ *
+ *     cpufreq_cpu_get / cpufreq_cpu_put        -- refcount, no rwsem
+ *     cpufreq_cpu_acquire / cpufreq_cpu_release -- refcount + write rwsem
+ *     cpufreq_get_policy                        -- read-only snapshot
+ *     cpufreq_update_policy                     -- re-validates freq limits,
+ *                                                  does NOT switch governors
+ *     cpufreq_register_notifier /
+ *     cpufreq_unregister_notifier               -- policy + transition hooks
+ *
+ *   cpufreq_set_policy() and cpufreq_start_governor() are NOT exported;
+ *   they cannot be called from a module.  Writing sysfs via filp_open +
+ *   kernel_write hits the LSM/SELinux path and fails with -EACCES on
+ *   vendor kernels (the AOSP neverallow for kernel writing sysfs_devices_
+ *   system_cpu survives ksu_allow injection).
+ *
+ *   The correct hook is CPUFREQ_POLICY_NOTIFIER / CPUFREQ_CREATE_POLICY:
+ *   the core calls notifiers with write rwsem already held and the policy
+ *   fully initialised but not yet started.  At that point we can legally
+ *   overwrite policy->governor because the governor has not been started
+ *   yet — no stop/start dance required.  cpufreq_start_governor() is then
+ *   called by the core immediately after the notifier chain returns.
+ *
+ *   For the re-enforcement case (init.rc overrides an already-running
+ *   policy), we register a CPUFREQ_POLICY_NOTIFIER as well: any time the
+ *   vendor writes a new governor name through sysfs the core fires
+ *   CPUFREQ_CREATE_POLICY again for that policy, which re-triggers our
+ *   notifier before the new governor is started.
+ *
+ *   schedutil is guaranteed present — it is selected at compile time and
+ *   the kernel will not build without it.  We obtain its struct pointer
+ *   once at module init via cpufreq_default_governor() (which returns
+ *   schedutil when CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y) or via
+ *   cpufreq_fallback_governor() as a second option; both are declared in
+ *   cpufreq.h.  Note that neither is EXPORT_SYMBOL — they are used at
+ *   module init time from __init context where the symbol resolution is
+ *   done by the module loader before the module's init function runs, so
+ *   they are accessible as long as the kernel is built with
+ *   CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y (which it must be).
+ *
+ *   If for any reason the governor pointer lookup fails at init we fall
+ *   back to cpufreq_register_governor() probing — but on a kernel where
+ *   schedutil is mandatory this path is never reached.
  */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/kthread.h>
-#include <linux/delay.h>
 #include <linux/cpufreq.h>
+#include <linux/notifier.h>
 #include <linux/string.h>
 #include <linux/atomic.h>
-#include <linux/workqueue.h>
-#include <linux/fs.h>
 #include <linux/raco_override.h>
-
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
-
-#define ENFORCER_DELAY_MS  25000
-#define ENFORCER_SCAN_MS    5000
-
-static struct task_struct *enforcer_thread;
-static struct workqueue_struct *enforcer_wq;
 
 static atomic_t raco_governor_trigger = ATOMIC_INIT(0);
 
-/* ------------------------------------------------------------------ */
-/* VFS helpers                                                          */
-/* ------------------------------------------------------------------ */
-
-static int enforcer_write_file(const char *path, const char *buf)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_WRONLY, 0);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-
-	ret = kernel_write(f, buf, strlen(buf), &pos);
-	filp_close(f, NULL);
-
-	return ret < 0 ? ret : 0;
-}
-
-static int enforcer_read_file(const char *path, char *buf, size_t len)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_RDONLY, 0);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-
-	ret = kernel_read(f, buf, len - 1, &pos);
-	filp_close(f, NULL);
-
-	if (ret >= 0)
-		buf[ret] = '\0';
-
-	return ret < 0 ? ret : 0;
-}
+/* Cached pointer to the schedutil governor struct.  Set once at init,
+ * read-only afterwards — no locking needed.                           */
+static struct cpufreq_governor *schedutil_gov;
 
 /* ------------------------------------------------------------------ */
-/* Core enforcement                                                     */
+/* Policy notifier                                                      */
 /* ------------------------------------------------------------------ */
 
 /*
- * enforce_schedutil_governor - Switch every policy-lead CPU that is not
- * already on schedutil to schedutil via the sysfs write path.
+ * enforcer_policy_notifier - Called by the cpufreq core on every policy
+ * lifecycle event with the policy's write rwsem already held.
  *
- * Policy-lead loop: cpufreq_cpu_get(cpu) returns the policy whose .cpu
- * field is the lead CPU for that cluster.  We skip any cpu where
- * policy->cpu != cpu to avoid writing to non-existent sysfs nodes
- * (e.g. policy1, policy2 don't exist on mt6833 — only policy0 and
- * policy4 do).
+ * We act on CPUFREQ_CREATE_POLICY only.  At this point the policy is fully
+ * initialised (governor field populated from the driver default or from
+ * the last sysfs write) but cpufreq_start_governor() has NOT been called
+ * yet.  Overwriting policy->governor here is therefore safe and correct:
+ * the core will start whichever governor is in that field when control
+ * returns from the notifier chain.
  *
- * MUST be called from a sleepable context.
- * MUST NOT hold policy->rwsem.
+ * This fires both at boot (initial policy creation) and any time a new
+ * governor is written to scaling_governor — which is exactly the init.rc
+ * override window we need to guard.
  */
-static void enforce_schedutil_governor(void)
+static int enforcer_policy_notifier(struct notifier_block *nb,
+				    unsigned long event, void *data)
 {
-	unsigned int cpu;
-	struct cpufreq_policy *policy;
-	char path[64];
-	int ret;
+	struct cpufreq_policy *policy = data;
 
-	for_each_possible_cpu(cpu) {
-		policy = cpufreq_cpu_get(cpu);
-		if (!policy)
-			continue;
+	if (event != CPUFREQ_CREATE_POLICY)
+		return NOTIFY_DONE;
 
-		/*
-		 * Skip non-lead CPUs.  On mt6833, cpufreq_cpu_get(1) returns
-		 * the policy for cluster 0 whose .cpu = 0.  Writing to
-		 * policy1/scaling_governor would hit -ENOENT because that
-		 * sysfs node does not exist.
-		 */
-		if (policy->cpu != cpu) {
-			cpufreq_cpu_put(policy);
-			continue;
-		}
+	if (!policy || !schedutil_gov)
+		return NOTIFY_DONE;
 
-		/* Already on schedutil — nothing to do */
-		if (policy->governor &&
-		    strncmp(policy->governor->name, "schedutil",
-			    CPUFREQ_NAME_LEN) == 0) {
-			cpufreq_cpu_put(policy);
-			continue;
-		}
+	/* Already on schedutil — nothing to do */
+	if (policy->governor == schedutil_gov)
+		return NOTIFY_DONE;
 
-		pr_info("schedutil_enforcer: policy%u running '%s', switching to schedutil\n",
-			cpu,
-			policy->governor ? policy->governor->name : "<none>");
+	pr_info("schedutil_enforcer: policy%u governor '%s' -> schedutil (notifier)\n",
+		policy->cpu,
+		policy->governor ? policy->governor->name : "<none>");
 
-		/* Release ref before the sysfs write — the write path
-		 * re-acquires the policy internally.                         */
-		cpufreq_cpu_put(policy);
+	policy->governor = schedutil_gov;
 
-		snprintf(path, sizeof(path),
-			 "/sys/devices/system/cpu/cpufreq/policy%u/scaling_governor",
-			 cpu);
-
-		ret = enforcer_write_file(path, "schedutil");
-		if (ret)
-			pr_warn("schedutil_enforcer: Failed to switch policy%u (err %d)\n",
-				cpu, ret);
-		else
-			pr_info("schedutil_enforcer: policy%u -> schedutil\n", cpu);
-	}
+	return NOTIFY_OK;
 }
 
-/* ------------------------------------------------------------------ */
-/* Readback watchdog                                                    */
-/* ------------------------------------------------------------------ */
-
-/*
- * check_governors_and_enforce - Read back the live scaling_governor for
- * every policy lead and re-enforce if any has drifted away from schedutil.
- *
- * This catches init.cgroup.rc writes that happen after Raco's active
- * window, direct sysfs writes from vendor daemons, and any other path
- * that bypasses the Raco pulse mechanism entirely.
- */
-static void check_governors_and_enforce(void)
-{
-	unsigned int cpu;
-	struct cpufreq_policy *policy;
-	char path[64];
-	char current_gov[CPUFREQ_NAME_LEN + 4]; /* +4 for possible newline + nul */
-	char *trimmed;
-	bool needs_enforce = false;
-
-	for_each_possible_cpu(cpu) {
-		policy = cpufreq_cpu_get(cpu);
-		if (!policy)
-			continue;
-
-		if (policy->cpu != cpu) {
-			cpufreq_cpu_put(policy);
-			continue;
-		}
-		cpufreq_cpu_put(policy);
-
-		snprintf(path, sizeof(path),
-			 "/sys/devices/system/cpu/cpufreq/policy%u/scaling_governor",
-			 cpu);
-
-		memset(current_gov, 0, sizeof(current_gov));
-		if (enforcer_read_file(path, current_gov, sizeof(current_gov)) < 0)
-			continue;
-
-		trimmed = strim(current_gov);
-		if (strncmp(trimmed, "schedutil", CPUFREQ_NAME_LEN) != 0) {
-			pr_info("schedutil_enforcer: Watchdog — policy%u drifted to '%s'! Re-enforcing.\n",
-				cpu, trimmed);
-			needs_enforce = true;
-			break; /* One bad policy is enough signal — enforce all */
-		}
-	}
-
-	if (needs_enforce)
-		enforce_schedutil_governor();
-}
-
-/* ------------------------------------------------------------------ */
-/* Deferred first-run on private workqueue                             */
-/* ------------------------------------------------------------------ */
-
-static void enforcer_first_run_work(struct work_struct *work)
-{
-	pr_info("schedutil_enforcer: First enforcement pass starting.\n");
-	enforce_schedutil_governor();
-}
-
-static DECLARE_DELAYED_WORK(enforcer_first_run, enforcer_first_run_work);
-
-/* ------------------------------------------------------------------ */
-/* Background monitoring thread                                         */
-/* ------------------------------------------------------------------ */
-
-static int enforcer_worker(void *data)
-{
-	pr_info("schedutil_enforcer: Worker active, scanning every %d ms\n",
-		ENFORCER_SCAN_MS);
-
-	while (!kthread_should_stop()) {
-		msleep_interruptible(ENFORCER_SCAN_MS);
-
-		if (kthread_should_stop())
-			break;
-
-		/*
-		 * Primary detection: readback watchdog.
-		 * Reads the live scaling_governor sysfs node every scan cycle
-		 * and re-enforces if any policy lead has drifted.  This catches
-		 * init.cgroup.rc and vendor daemon writes that the Raco pulse
-		 * mechanism has no visibility into.
-		 */
-		check_governors_and_enforce();
-
-		/*
-		 * Secondary: Raco pulse path — kept for symmetry with other
-		 * modules in this suite, but enforcement no longer depends on
-		 * it since nothing external writes 1 to raco_governor_trigger.
-		 */
-		if (atomic_cmpxchg(&raco_governor_trigger, 1, 0) == 1) {
-			pr_info("schedutil_enforcer: Raco pulse received, running extra enforcement pass.\n");
-			enforce_schedutil_governor();
-		}
-	}
-
-	return 0;
-}
+static struct notifier_block enforcer_policy_nb = {
+	.notifier_call = enforcer_policy_notifier,
+	/*
+	 * Use a high priority so we run before any vendor notifier that might
+	 * try to restore sugov_ext or another override governor.
+	 */
+	.priority = INT_MAX,
+};
 
 /* ------------------------------------------------------------------ */
 /* Module init / exit                                                   */
@@ -246,6 +127,32 @@ static int __init schedutil_enforcer_init(void)
 {
 	int ret;
 
+	/*
+	 * Obtain the schedutil governor pointer.
+	 *
+	 * cpufreq_default_governor() returns the governor selected by
+	 * CONFIG_CPU_FREQ_DEFAULT_GOV_* — schedutil on any sane Android
+	 * GKI kernel.  cpufreq_fallback_governor() is the secondary option.
+	 * Both are declared in cpufreq.h; schedutil is built-in so the
+	 * symbol is always present.
+	 */
+	schedutil_gov = cpufreq_default_governor();
+	if (!schedutil_gov ||
+	    strncmp(schedutil_gov->name, "schedutil", CPUFREQ_NAME_LEN) != 0) {
+		pr_warn("schedutil_enforcer: default governor is not schedutil, trying fallback\n");
+		schedutil_gov = cpufreq_fallback_governor();
+	}
+
+	if (!schedutil_gov ||
+	    strncmp(schedutil_gov->name, "schedutil", CPUFREQ_NAME_LEN) != 0) {
+		pr_err("schedutil_enforcer: Cannot locate schedutil governor struct — aborting\n");
+		return -ENODEV;
+	}
+
+	pr_info("schedutil_enforcer: Located schedutil governor @ %px\n",
+		schedutil_gov);
+
+	/* Register with Raco for symmetry; failure is non-fatal */
 	ret = raco_register_rc_override(&raco_governor_trigger, 0,
 					"schedutil.governor_lock");
 	if (ret == 0)
@@ -254,41 +161,31 @@ static int __init schedutil_enforcer_init(void)
 		pr_warn("schedutil_enforcer: Raco hook failed (%d), continuing without it\n",
 			ret);
 
-	enforcer_wq = create_singlethread_workqueue("sugov_enforcer_wq");
-	if (!enforcer_wq) {
-		pr_err("schedutil_enforcer: Failed to create workqueue\n");
+	/*
+	 * Register the policy notifier.  CPUFREQ_POLICY_NOTIFIER fires on
+	 * CPUFREQ_CREATE_POLICY for every existing policy at registration
+	 * time as well as for future events — so this single call both
+	 * enforces schedutil on currently active policies and arms the guard
+	 * for all future init.rc overrides.
+	 */
+	ret = cpufreq_register_notifier(&enforcer_policy_nb,
+					CPUFREQ_POLICY_NOTIFIER);
+	if (ret) {
+		pr_err("schedutil_enforcer: Failed to register policy notifier (%d)\n",
+		       ret);
 		raco_unregister_rc_override(&raco_governor_trigger);
-		return -ENOMEM;
+		return ret;
 	}
 
-	queue_delayed_work(enforcer_wq, &enforcer_first_run,
-			   msecs_to_jiffies(ENFORCER_DELAY_MS));
-	pr_info("schedutil_enforcer: First pass scheduled in %d ms\n",
-		ENFORCER_DELAY_MS);
-
-	enforcer_thread = kthread_run(enforcer_worker, NULL, "sugov_enforcer");
-	if (IS_ERR(enforcer_thread)) {
-		pr_err("schedutil_enforcer: Failed to start background worker\n");
-		cancel_delayed_work_sync(&enforcer_first_run);
-		destroy_workqueue(enforcer_wq);
-		raco_unregister_rc_override(&raco_governor_trigger);
-		return PTR_ERR(enforcer_thread);
-	}
-
-	pr_info("schedutil_enforcer: Module armed and active.\n");
+	pr_info("schedutil_enforcer: Policy notifier armed — schedutil enforced on all future governor changes.\n");
 	return 0;
 }
 
 static void __exit schedutil_enforcer_exit(void)
 {
-	if (enforcer_thread)
-		kthread_stop(enforcer_thread);
-
-	cancel_delayed_work_sync(&enforcer_first_run);
-	destroy_workqueue(enforcer_wq);
-
+	cpufreq_unregister_notifier(&enforcer_policy_nb,
+				    CPUFREQ_POLICY_NOTIFIER);
 	raco_unregister_rc_override(&raco_governor_trigger);
-
 	pr_info("schedutil_enforcer: Module unloaded cleanly.\n");
 }
 
@@ -297,4 +194,4 @@ module_exit(schedutil_enforcer_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Enforce schedutil as default CPUFreq governor");
+MODULE_DESCRIPTION("Enforce schedutil as default CPUFreq governor via policy notifier");
