@@ -1,17 +1,16 @@
-// yamada_gaming_boost.c
 // SPDX-License-Identifier: GPL-2.0-only
-// Yamada Gaming Boost — Boost CPU when get touch
+// Yamada Gaming Boost — Schedutil Vendor Hook Edition
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
 #include <linux/cpufreq.h>
 #include <linux/workqueue.h>
-#include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/input.h>
+#include <trace/hooks/sched.h> // Required for Android Vendor Hooks
 
-#define BOOST_DURATION_MS   500
+#define BOOST_DURATION_MS   1000
 
 static bool yamada_boost_enabled = true;
 module_param(yamada_boost_enabled, bool, 0644);
@@ -22,116 +21,93 @@ module_param(boost_duration_ms, uint, 0644);
 static bool is_boosted = false;
 static DEFINE_SPINLOCK(boost_lock);
 
-static struct freq_qos_request boost_min_req[NR_CPUS];
-static struct freq_qos_request boost_max_req[NR_CPUS];
-static bool qos_initialized[NR_CPUS];
-
-static struct work_struct boost_on_work;
 static struct delayed_work boost_off_work;
 
-/* Hook dari drivers/input/input.c */
+/* Hook from drivers/input/input.c */
 extern void (*yamada_boost_hook)(void);
 
-static void do_boost_on(struct work_struct *work) {
-    unsigned int cpu;
-    struct cpufreq_policy *policy;
+/**
+ * yamada_vh_map_util_freq_probe - Intercepts schedutil's frequency mapping
+ * 
+ * This callback matches the prototype defined in trace/hooks/sched.h
+ */
+static void yamada_vh_map_util_freq_probe(void *data, unsigned long util,
+					  unsigned long freq, unsigned long cap,
+					  unsigned long *next_freq,
+					  struct cpufreq_policy *policy,
+					  bool *need_freq_update)
+{
+	unsigned long flags;
+	bool active_boost;
 
-    for_each_online_cpu(cpu) {
-        policy = cpufreq_cpu_get(cpu);
-        if (policy) {
-            if (policy->cpu == cpu) {
-                if (!qos_initialized[cpu]) {
-                    freq_qos_add_request(&policy->constraints, &boost_min_req[cpu], FREQ_QOS_MIN, policy->cpuinfo.min_freq);
-                    freq_qos_add_request(&policy->constraints, &boost_max_req[cpu], FREQ_QOS_MAX, policy->cpuinfo.max_freq);
-                    qos_initialized[cpu] = true;
-                }
-                /* DOBRAK ATAPNYA DULU BARU LANTAINYA! */
-                freq_qos_update_request(&boost_max_req[cpu], policy->cpuinfo.max_freq);
-                freq_qos_update_request(&boost_min_req[cpu], policy->cpuinfo.max_freq);
-            }
-            cpufreq_cpu_put(policy);
-        }
-    }
-    pr_info("yamada_gaming_boost: touch boost ON (ROOF BROKEN!)\n");
+	if (!yamada_boost_enabled)
+		return;
+
+	spin_lock_irqsave(&boost_lock, flags);
+	active_boost = is_boosted;
+	spin_unlock_irqrestore(&boost_lock, flags);
+
+	/* If the screen is being touched, bypass normal math and force maxfreq instantly! */
+	if (active_boost && policy && next_freq && need_freq_update) {
+		*next_freq = policy->cpuinfo.max_freq;
+		*need_freq_update = true;
+	}
 }
 
 static void do_boost_off(struct work_struct *work) {
-    unsigned int cpu;
-    struct cpufreq_policy *policy;
-    unsigned long flags;
+	unsigned long flags;
 
-    spin_lock_irqsave(&boost_lock, flags);
-    is_boosted = false;
-    spin_unlock_irqrestore(&boost_lock, flags);
+	spin_lock_irqsave(&boost_lock, flags);
+	is_boosted = false;
+	spin_unlock_irqrestore(&boost_lock, flags);
 
-    for_each_online_cpu(cpu) {
-        if (!qos_initialized[cpu]) continue;
-        
-        policy = cpufreq_cpu_get(cpu);
-        if (policy) {
-            if (policy->cpu == cpu) {
-                freq_qos_update_request(&boost_min_req[cpu], policy->cpuinfo.min_freq);
-                freq_qos_update_request(&boost_max_req[cpu], policy->cpuinfo.max_freq);
-            }
-            cpufreq_cpu_put(policy);
-        }
-    }
-    pr_info("yamada_gaming_boost: touch boost OFF\n");
+	pr_info("yamada_gaming_boost: touch boost OFF (Letting schedutil handle math again)\n");
 }
 
 static void kobo_trigger_boost(void) {
-    unsigned long flags;
-    bool need_boost_on = false;
+	unsigned long flags;
 
-    if (!yamada_boost_enabled) return;
+	if (!yamada_boost_enabled) 
+		return;
 
-    spin_lock_irqsave(&boost_lock, flags);
-    if (!is_boosted) {
-        is_boosted = true;
-        need_boost_on = true;
-    }
-    spin_unlock_irqrestore(&boost_lock, flags);
+	spin_lock_irqsave(&boost_lock, flags);
+	if (!is_boosted) {
+		is_boosted = true;
+		pr_info("yamada_gaming_boost: touch boost ON (Vendor Hook Intercept Active)\n");
+	}
+	spin_unlock_irqrestore(&boost_lock, flags);
 
-    if (need_boost_on) {
-        schedule_work(&boost_on_work);
-    }
-
-    mod_delayed_work(system_wq, &boost_off_work, msecs_to_jiffies(boost_duration_ms));
-}
-
-static void boost_qos_cleanup(void) {
-    unsigned int cpu;
-    for_each_possible_cpu(cpu) {
-        if (qos_initialized[cpu]) {
-            freq_qos_remove_request(&boost_min_req[cpu]);
-            freq_qos_remove_request(&boost_max_req[cpu]);
-            qos_initialized[cpu] = false;
-        }
-    }
+	/* Refresh the delayed work timer on every touch event */
+	mod_delayed_work(system_wq, &boost_off_work, msecs_to_jiffies(boost_duration_ms));
 }
 
 static int __init yamada_gaming_boost_init(void) {
-    if (!yamada_boost_enabled) return 0;
+	int ret;
 
-    memset(qos_initialized, 0, sizeof(qos_initialized));
+	INIT_DELAYED_WORK(&boost_off_work, do_boost_off);
 
-    INIT_WORK(&boost_on_work, do_boost_on);
-    INIT_DELAYED_WORK(&boost_off_work, do_boost_off);
+	/* Register our probe to the Android Schedutil Vendor Hook */
+	ret = register_trace_android_vh_map_util_freq(yamada_vh_map_util_freq_probe, NULL);
+	if (ret) {
+		pr_err("yamada_gaming_boost: Failed to register schedutil vendor hook probe!\n");
+		return ret;
+	}
 
-    yamada_boost_hook = kobo_trigger_boost;
+	yamada_boost_hook = kobo_trigger_boost;
 
-    pr_info("yamada_gaming_boost: active\n");
-    return 0;
+	pr_info("yamada_gaming_boost: Active (Vendor Hook Mode)\n");
+	return 0;
 }
 
 static void __exit yamada_gaming_boost_exit(void) {
-    yamada_boost_hook = NULL;
+	yamada_boost_hook = NULL;
 
-    cancel_work_sync(&boost_on_work);
-    cancel_delayed_work_sync(&boost_off_work);
-    boost_qos_cleanup();
+	/* Unregister the probe so we don't leave wild pointers in the scheduler */
+	unregister_trace_android_vh_map_util_freq(yamada_vh_map_util_freq_probe, NULL);
 
-    pr_info("yamada_gaming_boost: unloaded\n");
+	cancel_delayed_work_sync(&boost_off_work);
+
+	pr_info("yamada_gaming_boost: Unloaded\n");
 }
 
 module_init(yamada_gaming_boost_init);
@@ -139,4 +115,4 @@ module_exit(yamada_gaming_boost_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Yamada Gaming Boost — Boost CPU when get touch");
+MODULE_DESCRIPTION("Yamada Gaming Boost — Schedutil Vendor Hook Edition");
