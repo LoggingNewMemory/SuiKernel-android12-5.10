@@ -34,7 +34,7 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	unsigned long flags;
 	int ret;
 
-	char *target_binary = "/data/adb/ksu/bin/reresetprop";
+	char *target_binary = "/data/adb/ksu/bin/resetprop";
 
 	char *argv[] = { target_binary, NULL, NULL, NULL };
 	char *envp[] = { "HOME=/", "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", NULL };
