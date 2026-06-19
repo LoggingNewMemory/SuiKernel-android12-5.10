@@ -34,9 +34,10 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	unsigned long flags;
 	int ret;
 
-	char *target_binary = "/data/adb/ksu/bin/resetprop";
+	char *target_binary = "/system/bin/su";
+	char cmd[256];
 
-	char *argv[] = { target_binary, NULL, NULL, NULL };
+	char *argv[] = { target_binary, "-c", cmd, NULL };
 	char *envp[] = { "HOME=/", "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", NULL };
 
 	spin_lock_irqsave(&pavolia_lock, flags);
@@ -48,20 +49,19 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	job = list_first_entry(&pavolia_prop_list, struct pavolia_prop_job, list);
 	spin_unlock_irqrestore(&pavolia_lock, flags);
 
-	argv[1] = job->prop;
-	argv[2] = job->val;
+	snprintf(cmd, sizeof(cmd), "/data/adb/ksu/bin/resetprop -n %s \"%s\"", job->prop, job->val);
 
 	/* Execute as root from kernel space and wait for exit code */
 	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 
 	if (ret != 0) {
-		/* Failed: /data/adb/ksu not mounted, or binary not ready. Retry in 2s. */
+		/* Failed: /system or /data not mounted. Retry in 2s. */
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
 		return;
 	}
 
 	/* If we succeeded, Android is fully awake! Process the ENTIRE queue sequentially using the found binary */
-	pr_info("pavolia_reine: Android property service online using '%s'. Processing queue...\n", target_binary);
+	pr_info("pavolia_reine: Android property service online via su. Processing queue...\n");
 
 	while (1) {
 		spin_lock_irqsave(&pavolia_lock, flags);
@@ -73,8 +73,7 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		list_del(&job->list);
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 
-		argv[1] = job->prop;
-		argv[2] = job->val;
+		snprintf(cmd, sizeof(cmd), "/data/adb/ksu/bin/resetprop -n %s \"%s\"", job->prop, job->val);
 		
 		/* We don't check return value here because we already proved it works above */
 		call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
