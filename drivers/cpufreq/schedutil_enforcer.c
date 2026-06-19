@@ -15,9 +15,6 @@
 #include <linux/cpumask.h>
 #include <linux/raco_override.h>
 
-static atomic_t schedutil_enforcer_active = ATOMIC_INIT(1);
-static struct task_struct *schedutil_thread;
-
 static void set_governor_to_schedutil(void)
 {
 	struct file *filp;
@@ -38,38 +35,15 @@ static void set_governor_to_schedutil(void)
 	}
 }
 
-static int schedutil_enforcer_thread(void *data)
-{
-	int retries = 30;
-
-	pr_info("schedutil_enforcer: Kobo's dynamic water magic activated! Forcing schedutil on ALL cores...\n");
-
-	while (!kthread_should_stop() && retries > 0) {
-		if (atomic_read(&schedutil_enforcer_active) == 1) {
-			set_governor_to_schedutil();
-		}
-
-		msleep_interruptible(5000);
-		retries--;
-	}
-
-	pr_info("schedutil_enforcer: Boot phase complete, going to sleep~ zzz...\n");
-	return 0;
-}
-
 static int __init schedutil_enforcer_init(void)
 {
 	int err;
 
-	err = raco_register_rc_override(&schedutil_enforcer_active, 1, "schedutil_enforcer_flag");
+	err = raco_register_rc_override(set_governor_to_schedutil, "schedutil_enforcer_flag");
 	if (err) {
 		pr_err("schedutil_enforcer: Anjir! Failed to register with Raco!\n");
-	}
-
-	schedutil_thread = kthread_run(schedutil_enforcer_thread, NULL, "schedutil_enforcer");
-	if (IS_ERR(schedutil_thread)) {
-		pr_err("schedutil_enforcer: Failed to spawn thread\n");
-		return PTR_ERR(schedutil_thread);
+	} else {
+		pr_info("schedutil_enforcer: Kobo's dynamic water magic activated via Raco!\n");
 	}
 
 	return 0;

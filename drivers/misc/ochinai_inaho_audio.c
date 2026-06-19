@@ -49,12 +49,9 @@ static bool pm_qos_active;
 static struct task_struct *inaho_thread;
 
 /*
- * Raco pulse trigger — atomic_t to match updated Raco API.
- * Raco Sniper resets this to 1 when it detects a vendor write;
- * inaho_worker catches the transition 1->0 via atomic_cmpxchg and
- * re-enforces the CPUSet layout.
+ * Watchdog thread settings
  */
-static atomic_t raco_cpuset_trigger = ATOMIC_INIT(0);
+#define AUDIO_SCAN_MS 5000
 
 /* Enlarged to 32 bytes — handles ≥ 10-core SoCs safely */
 static char dynamic_cpu_mask[32];
@@ -213,19 +210,11 @@ static int inaho_worker(void *data)
 		inaho_boost_audio_threads();
 
 		/*
-		 * Raco Sniper sets raco_cpuset_trigger to 1 when it detects a
-		 * vendor service wrote to the guarded value.  We catch the
-		 * 0->1 transition atomically, re-enforce, and reset to 0.
+		 * Watchdog: read the live cpuset value and re-enforce
+		 * if a vendor service rolled it back without triggering
+		 * Raco (e.g. direct sysfs write after Raco's window).
 		 */
-		if (atomic_cmpxchg(&raco_cpuset_trigger, 1, 0) == 1) {
-			pr_info("inaho: Raco pulse — vendor CPUSet override caught! Re-enforcing.\n");
-			inaho_execute_cpuset_override();
-		} else {
-			/*
-			 * Watchdog: read the live cpuset value and re-enforce
-			 * if a vendor service rolled it back without triggering
-			 * Raco (e.g. direct sysfs write after Raco's window).
-			 */
+		{
 			struct file *f = filp_open("/dev/cpuset/foreground/cpus",
 						   O_RDONLY, 0);
 			if (!IS_ERR(f)) {
@@ -263,8 +252,7 @@ static int __init inaho_audio_enhance_init(void)
 		return 0;
 	}
 
-	if (raco_register_rc_override(&raco_cpuset_trigger, 0,
-				      "audio.cpuset_lock") == 0)
+	if (raco_register_rc_override(inaho_execute_cpuset_override, "audio.cpuset_lock") == 0)
 		pr_info("inaho: CPUSet guard hooked to Raco Global Sniper\n");
 	else
 		pr_warn("inaho: Raco hook failed, continuing without it\n");
@@ -273,7 +261,7 @@ static int __init inaho_audio_enhance_init(void)
 	if (IS_ERR(inaho_thread)) {
 		pr_err("inaho: failed to start thread: %ld\n",
 		       PTR_ERR(inaho_thread));
-		raco_unregister_rc_override(&raco_cpuset_trigger);
+		raco_unregister_rc_override(inaho_execute_cpuset_override);
 		return PTR_ERR(inaho_thread);
 	}
 
@@ -288,9 +276,9 @@ static void __exit inaho_audio_enhance_exit(void)
 
 	/*
 	 * Unregister AFTER stopping the thread so the worker cannot race
-	 * with Raco's sniper on raco_cpuset_trigger during teardown.
+	 * with Raco's sniper during teardown.
 	 */
-	raco_unregister_rc_override(&raco_cpuset_trigger);
+	raco_unregister_rc_override(inaho_execute_cpuset_override);
 
 	if (pm_qos_active) {
 		cpu_latency_qos_remove_request(&inaho_pm_qos);

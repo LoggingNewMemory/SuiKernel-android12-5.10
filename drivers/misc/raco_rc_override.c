@@ -20,9 +20,9 @@
 #define RACO_MAX_RETRIES  24   /* ~120 s of active guarding after boot   */
 
 struct raco_target {
-	atomic_t       *kernel_val_ptr;
-	int             target_val;
+	raco_enforce_cb_t cb;
 	const char     *name;
+	unsigned long   expires;
 	struct list_head list;
 };
 
@@ -34,41 +34,38 @@ static struct task_struct *raco_thread;
 
 static int raco_sniper_thread(void *data)
 {
-	int retries = RACO_MAX_RETRIES;
-	struct raco_target *entry, *tmp;
+	struct raco_target *entry;
+	int active;
 
-	pr_info("raco_override: Sniper deployed, guarding for ~%d s\n",
-		(RACO_SCAN_MS / 1000) * RACO_MAX_RETRIES);
+	pr_info("raco_override: Sniper deployed dynamically\n");
 
-	while (!kthread_should_stop() && retries > 0) {
+	while (!kthread_should_stop()) {
 		msleep_interruptible(RACO_SCAN_MS);
 
 		if (kthread_should_stop())
 			break;
 
+		active = 0;
 		mutex_lock(&raco_list_lock);
 		list_for_each_entry(entry, &raco_target_list, list) {
-			if (atomic_read(entry->kernel_val_ptr) != entry->target_val) {
-				pr_info("raco_override: Caught init.rc altering '%s'! Forcing back to %d\n",
-					entry->name, entry->target_val);
-				atomic_set(entry->kernel_val_ptr, entry->target_val);
+			if (time_before(jiffies, entry->expires)) {
+				active++;
+				if (entry->cb) {
+					/* Punch vendor init.rc! Execute the callback unconditionally */
+					entry->cb();
+				}
 			}
 		}
+
+		if (active == 0) {
+			raco_thread = NULL;   /* must clear before releasing lock */
+			mutex_unlock(&raco_list_lock);
+			break;
+		}
 		mutex_unlock(&raco_list_lock);
-
-		retries--;
 	}
 
-	/* Cleanup — hold the lock so no caller walks the list mid-free */
-	mutex_lock(&raco_list_lock);
-	list_for_each_entry_safe(entry, tmp, &raco_target_list, list) {
-		list_del(&entry->list);
-		kfree(entry);
-	}
-	raco_thread = NULL;   /* must clear before releasing lock */
-	mutex_unlock(&raco_list_lock);
-
-	pr_info("raco_override: Sniper mission complete, list cleaned up.\n");
+	pr_info("raco_override: Sniper mission complete, thread stopped.\n");
 	return 0;
 }
 
@@ -78,10 +75,12 @@ static int raco_sniper_thread(void *data)
  * raco_register_rc_override - Register an atomic_t to be held at a
  *                              fixed value against init.rc interference.
  */
-int raco_register_rc_override(atomic_t *target_ptr, int desired_val,
-			      const char *name)
+int raco_register_rc_override(raco_enforce_cb_t enforce_cb, const char *name)
 {
 	struct raco_target *new_target;
+
+	if (!enforce_cb)
+		return -EINVAL;
 
 	new_target = kmalloc(sizeof(*new_target), GFP_KERNEL);
 	if (!new_target) {
@@ -89,13 +88,13 @@ int raco_register_rc_override(atomic_t *target_ptr, int desired_val,
 		return -ENOMEM;
 	}
 
-	new_target->kernel_val_ptr = target_ptr;
-	new_target->target_val     = desired_val;
+	new_target->cb             = enforce_cb;
 	new_target->name           = name;
+	new_target->expires        = jiffies + msecs_to_jiffies(RACO_SCAN_MS * RACO_MAX_RETRIES);
 
 	mutex_lock(&raco_list_lock);
 	list_add_tail(&new_target->list, &raco_target_list);
-	pr_info("raco_override: Registered '%s' -> %d\n", name, desired_val);
+	pr_info("raco_override: Registered '%s' for active enforcement\n", name);
 
 	if (!raco_thread) {
 		raco_thread = kthread_run(raco_sniper_thread, NULL, "raco_sniper");
@@ -120,25 +119,25 @@ EXPORT_SYMBOL_GPL(raco_register_rc_override);
  * Safe to call even after the Sniper thread has self-terminated (the list
  * will simply be empty and -ENOENT is returned, which callers can ignore).
  */
-int raco_unregister_rc_override(atomic_t *target_ptr)
+int raco_unregister_rc_override(raco_enforce_cb_t enforce_cb)
 {
 	struct raco_target *entry, *tmp;
 
 	mutex_lock(&raco_list_lock);
 	list_for_each_entry_safe(entry, tmp, &raco_target_list, list) {
-		if (entry->kernel_val_ptr == target_ptr) {
+		if (entry->cb == enforce_cb) {
 			list_del(&entry->list);
 			kfree(entry);
-			pr_info("raco_override: Unregistered target %px\n",
-				target_ptr);
+			pr_info("raco_override: Unregistered target for cb %px\n",
+				enforce_cb);
 			mutex_unlock(&raco_list_lock);
 			return 0;
 		}
 	}
 	mutex_unlock(&raco_list_lock);
 
-	pr_warn("raco_override: Unregister called but target %px not found\n",
-		target_ptr);
+	pr_warn("raco_override: Unregister called but target cb %px not found\n",
+		enforce_cb);
 	return -ENOENT;
 }
 EXPORT_SYMBOL_GPL(raco_unregister_rc_override);
