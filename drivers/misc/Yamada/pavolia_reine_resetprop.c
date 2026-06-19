@@ -36,30 +36,15 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	struct file *f;
 	int ret;
 
-	/*
-	 * call_usermodehelper spawns processes as children of kthreadd (PID 2),
-	 * which lives in the initial kernel mount namespace. Android's init
-	 * (PID 1) creates its own mount namespace where /dev/__properties__
-	 * (the shared-memory property area) is visible. resetprop needs to mmap
-	 * that area, so we must use nsenter to hop into init's mount namespace.
-	 *
-	 * We call nsenter directly — it's a standard Android toybox applet.
-	 * nsenter already runs as UID 0 (kernel context), so no 'su' is needed.
-	 */
-	char *argv[] = {
-		"/system/bin/nsenter", "-t", "1", "-m", "--",
-		"/data/adb/ksud", "resetprop", "-n", NULL, NULL, NULL
-	};
-	char *envp[] = {
-		"HOME=/",
-		"PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin",
-		NULL
-	};
+	char *target_binary = "/system/bin/sh";
+	char cmd[512];
 
-	/* Check if the KSU payload is mounted.
-	 * We check for the main 'ksud' binary instead of 'resetprop' because
-	 * 'resetprop' is a symlink, and the kernel domain lacks lnk_file read
-	 * permissions, triggering an SELinux denial. */
+	char *argv[] = { target_binary, "-c", cmd, NULL };
+	char *envp[] = { "HOME=/", "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", NULL };
+
+	/* Because 'su' swallows exit codes, we must explicitly check if the KSU payload is mounted.
+	 * We check for the main 'ksud' binary instead of 'resetprop' because 'resetprop' is a symlink,
+	 * and the kernel domain lacks lnk_file read permissions, triggering an SELinux denial. */
 	f = filp_open("/data/adb/ksud", O_RDONLY, 0);
 	if (IS_ERR(f)) {
 		/* Not mounted yet, wait 2 seconds and try again */
@@ -74,25 +59,23 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		return;
 	}
 
-	/* Peek at the first job to test the command */
+	/* Peek at the first job to construct the test command */
 	job = list_first_entry(&pavolia_prop_list, struct pavolia_prop_job, list);
 	spin_unlock_irqrestore(&pavolia_lock, flags);
 
-	argv[8] = job->prop;
-	argv[9] = job->val;
+	snprintf(cmd, sizeof(cmd), "/system/bin/su -c \"/data/adb/ksud resetprop -n %s \\\"%s\\\"\"", job->prop, job->val);
 
-	/* Execute as root from kernel space, inside init's mount namespace */
+	/* Execute as root from kernel space */
 	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 
 	if (ret != 0) {
-		/* Failed to execute nsenter/ksud. Retry in 2s. */
-		pr_info("pavolia_reine: nsenter/ksud failed (ret=%d), retrying...\n", ret);
+		/* Failed to execute sh. Retry in 2s. */
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
 		return;
 	}
 
-	/* If we succeeded, Android is fully awake! Process the ENTIRE queue. */
-	pr_info("pavolia_reine: Android property service online via nsenter. Processing queue...\n");
+	/* If we succeeded, Android is fully awake! Process the ENTIRE queue sequentially using the found binary */
+	pr_info("pavolia_reine: Android property service online via sh+su. Processing queue...\n");
 
 	while (1) {
 		spin_lock_irqsave(&pavolia_lock, flags);
@@ -104,15 +87,15 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		list_del(&job->list);
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 
-		argv[8] = job->prop;
-		argv[9] = job->val;
-
+		snprintf(cmd, sizeof(cmd), "/system/bin/su -c \"/data/adb/ksud resetprop -n %s \\\"%s\\\"\"", job->prop, job->val);
+		
+		/* We don't check return value here because we already proved it works above */
 		call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
-
+		
 		pr_info("pavolia_reine: Injected -> %s = %s\n", job->prop, job->val);
 		kfree(job);
 	}
-
+	
 	pr_info("pavolia_reine: All queued properties successfully injected!\n");
 }
 
