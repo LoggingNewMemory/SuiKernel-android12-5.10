@@ -242,38 +242,6 @@ config CPUFREQ_DUMMY
 
 	  If in doubt, say N
 
-config SANDEVISTAN_BOOT
-    tristate "Sandevistan Boot — temporary performance governor boost"
-    depends on CPU_FREQ && CPU_FREQ_GOV_PERFORMANCE && CPU_FREQ_GOV_SCHEDUTIL
-    help
-      Sets the CPUfreq governor to 'performance' during boot for
-      BOOST_DELAY_SEC seconds, then reverts to 'schedutil'.
-      Safe for GKI 2.0 / Android 5.10. Say M to build as a module.
-
-config YAMADA_GAMING_BOOST
-    tristate "Yamada Gaming Boost — CPU input boost + schedutil tuning"
-    depends on CPU_FREQ && CPU_FREQ_GOV_SCHEDUTIL && INPUT
-    help
-      Boosts CPU to max frequency and sets schedutil rate_limit_us
-      to 0 on touch/key input events. Reverts after boost window.
-      Author: Kanagawa Yamada. Say Y or M.
-
-config YAMADA_TENEBRION
-    tristate "Tenebrion — CPU freq drop on screen off"
-    depends on CPU_FREQ && SUSPEND
-    help
-      Drops all CPU frequencies to minimum on system suspend,
-      restores full range on resume.
-      Author: Kanagawa Yamada. Say Y or M.
-
-config SCHEDUTIL_ENFORCER
-	tristate "Enforce Schedutil as Default Governor"
-	depends on CPU_FREQ_DEFAULT_GOV_SCHEDUTIL && RACO_RC_OVERRIDE
-	help
-	 This have to be done because some init on vendor sets the Governor
-	 to sugov_ext (Which actually kinda same with schedutil). But because
-	 my eye I don't want to see it. Feel free to use this as reference if
-	 you want to change the governor with your own choice. Say Y or N
 
 if X86
 source "drivers/cpufreq/Kconfig.x86"
