@@ -25,7 +25,8 @@ struct pavolia_prop_job {
 
 static LIST_HEAD(pavolia_prop_list);
 static DEFINE_SPINLOCK(pavolia_lock);
-static struct delayed_work pavolia_dwork;
+static void pavolia_reine_work_fn(struct work_struct *work);
+static DECLARE_DELAYED_WORK(pavolia_dwork, pavolia_reine_work_fn);
 
 static void pavolia_reine_work_fn(struct work_struct *work)
 {
@@ -124,7 +125,6 @@ EXPORT_SYMBOL_GPL(pavolia_reine_setprop);
 
 static int __init pavolia_reine_init(void)
 {
-	INIT_DELAYED_WORK(&pavolia_dwork, pavolia_reine_work_fn);
 	pr_info("pavolia_reine: Android Property Injection API initialized.\n");
 	return 0;
 }

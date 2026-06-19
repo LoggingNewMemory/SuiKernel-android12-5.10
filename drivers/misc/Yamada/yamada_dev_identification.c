@@ -17,12 +17,7 @@ static int __init yamada_dev_ident_init(void)
 	return 0;
 }
 
-static void __exit yamada_dev_ident_exit(void)
-{
-}
-
 module_init(yamada_dev_ident_init);
-module_exit(yamada_dev_ident_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kanagawa Yamada");
