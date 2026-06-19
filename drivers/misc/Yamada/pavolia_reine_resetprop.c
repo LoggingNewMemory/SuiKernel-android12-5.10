@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 #include <linux/string.h>
+#include <linux/fs.h>
 #include <linux/pavolia_reine_resetprop.h>
 
 #include <linux/list.h>
@@ -32,6 +33,7 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 {
 	struct pavolia_prop_job *job;
 	unsigned long flags;
+	struct file *f;
 	int ret;
 
 	char *target_binary = "/system/bin/su";
@@ -45,17 +47,28 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 		return;
 	}
-	/* Peek at the first job to test if Android property service is online */
+
+	/* Because 'su' swallows exit codes, we must explicitly check if the KSU payload is mounted */
+	f = filp_open("/data/adb/ksu/bin/resetprop", O_RDONLY, 0);
+	if (IS_ERR(f)) {
+		spin_unlock_irqrestore(&pavolia_lock, flags);
+		/* Not mounted yet, wait 2 seconds and try again */
+		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
+		return;
+	}
+	filp_close(f, NULL);
+
+	/* Peek at the first job to construct the test command */
 	job = list_first_entry(&pavolia_prop_list, struct pavolia_prop_job, list);
 	spin_unlock_irqrestore(&pavolia_lock, flags);
 
 	snprintf(cmd, sizeof(cmd), "/data/adb/ksu/bin/resetprop -n %s \"%s\"", job->prop, job->val);
 
-	/* Execute as root from kernel space and wait for exit code */
+	/* Execute as root from kernel space */
 	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 
 	if (ret != 0) {
-		/* Failed: /system or /data not mounted. Retry in 2s. */
+		/* Failed to execute su. Retry in 2s. */
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
 		return;
 	}
