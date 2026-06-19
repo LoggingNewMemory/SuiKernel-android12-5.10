@@ -214,8 +214,9 @@ static int inaho_worker(void *data)
 		 * if a vendor service rolled it back without triggering
 		 * Raco (e.g. direct sysfs write after Raco's window).
 		 */
-		struct file *f = filp_open("/dev/cpuset/foreground/cpus",
-					   O_RDONLY, 0);
+		{
+			struct file *f = filp_open("/dev/cpuset/foreground/cpus",
+						   O_RDONLY, 0);
 			if (!IS_ERR(f)) {
 				char current_mask[32] = {0};
 				char *cleaned;
@@ -232,6 +233,7 @@ static int inaho_worker(void *data)
 					inaho_execute_cpuset_override();
 				}
 			}
+		}
 
 		msleep_interruptible(AUDIO_SCAN_MS);
 	}
@@ -274,9 +276,9 @@ static void __exit inaho_audio_enhance_exit(void)
 
 	/*
 	 * Unregister AFTER stopping the thread so the worker cannot race
-	 * with Raco's sniper on raco_cpuset_trigger during teardown.
+	 * with Raco's sniper during teardown.
 	 */
-	raco_unregister_rc_override(&raco_cpuset_trigger);
+	raco_unregister_rc_override(inaho_execute_cpuset_override);
 
 	if (pm_qos_active) {
 		cpu_latency_qos_remove_request(&inaho_pm_qos);
