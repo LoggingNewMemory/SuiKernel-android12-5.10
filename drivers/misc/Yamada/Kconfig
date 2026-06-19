@@ -58,4 +58,11 @@ config SCHEDUTIL_ENFORCER
 	 my eye I don't want to see it. Feel free to use this as reference if
 	 you want to change the governor with your own choice. Say Y or N
 
+config YAMADA_DEV_IDENTIFICATION
+  tristate "Identification of this kernel developer IS"
+  help
+   This is actually to test PAVOLIA_REINE_SETPROP but eh, it would be a
+   good Identification that this kernel is make by me anyway. This will
+   be also an example usage of PAVOLIA_REINE_SETPROP API
+
 endmenu
