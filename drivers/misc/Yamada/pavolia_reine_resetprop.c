@@ -63,7 +63,7 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	job = list_first_entry(&pavolia_prop_list, struct pavolia_prop_job, list);
 	spin_unlock_irqrestore(&pavolia_lock, flags);
 
-	snprintf(cmd, sizeof(cmd), "/data/adb/ksu/bin/resetprop -n %s \"%s\"", job->prop, job->val);
+	snprintf(cmd, sizeof(cmd), "/data/adb/ksud resetprop -n %s \"%s\"", job->prop, job->val);
 
 	/* Execute as root from kernel space */
 	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
@@ -87,7 +87,7 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		list_del(&job->list);
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 
-		snprintf(cmd, sizeof(cmd), "/data/adb/ksu/bin/resetprop -n %s \"%s\"", job->prop, job->val);
+		snprintf(cmd, sizeof(cmd), "/data/adb/ksud resetprop -n %s \"%s\"", job->prop, job->val);
 		
 		/* We don't check return value here because we already proved it works above */
 		call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
