@@ -20,8 +20,8 @@ config RACO_RC_OVERRIDE
     help 
 	  To counter the sysfs write by rogue vendor init.rc scripts during boot.
 
-config PAVOLIA_REINE_SETPROP
-	tristate "Pavolia Reine API prop tool"
+config PAVOLIA_REINE_RESETPROP
+	tristate "Pavolia Reine API resetprop tool"
 	default y
 	help
 	  Please see the required SELinux for this (See selinux.sh for more details)

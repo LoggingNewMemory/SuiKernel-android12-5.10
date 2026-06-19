@@ -7,12 +7,12 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/pavolia_reine_setprop.h>
+#include <linux/pavolia_reine_resetprop.h>
 
 static int __init yamada_dev_ident_init(void)
 {
-	pavolia_reine_setprop("suikernel.developer.is", "Kanagawa Yamada");
-	pavolia_reine_setprop("hoshimachi.suisei", "Stellar Stellar");
+	pavolia_reine_resetprop("suikernel.developer.is", "Kanagawa Yamada");
+	pavolia_reine_resetprop("hoshimachi.suisei", "Stellar Stellar");
 
 	return 0;
 }

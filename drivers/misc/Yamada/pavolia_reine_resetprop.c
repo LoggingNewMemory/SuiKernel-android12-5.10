@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * drivers/misc/pavolia_reine_setprop.c
+ * drivers/misc/pavolia_reine_resetprop.c
  * Pavolia Reine Setprop Engine - Inject Android properties from kernel
  * Author: Kanagawa Yamada
  */
@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 #include <linux/string.h>
-#include <linux/pavolia_reine_setprop.h>
+#include <linux/pavolia_reine_resetprop.h>
 
 #include <linux/list.h>
 #include <linux/spinlock.h>
@@ -34,7 +34,9 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	unsigned long flags;
 	int ret;
 
-	char *argv[] = { "/system/bin/setprop", NULL, NULL, NULL };
+	char *target_binary = "/data/adb/ksu/bin/reresetprop";
+
+	char *argv[] = { target_binary, NULL, NULL, NULL };
 	char *envp[] = { "HOME=/", "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", NULL };
 
 	spin_lock_irqsave(&pavolia_lock, flags);
@@ -53,13 +55,13 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 
 	if (ret != 0) {
-		/* Failed: /system not mounted, or property_service not ready. Retry in 2s. */
+		/* Failed: /data/adb/ksu not mounted, or binary not ready. Retry in 2s. */
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
 		return;
 	}
 
-	/* If we succeeded, Android is fully awake! Process the ENTIRE queue sequentially */
-	pr_info("pavolia_reine: Android property service is online. Processing queue...\n");
+	/* If we succeeded, Android is fully awake! Process the ENTIRE queue sequentially using the found binary */
+	pr_info("pavolia_reine: Android property service online using '%s'. Processing queue...\n", target_binary);
 
 	while (1) {
 		spin_lock_irqsave(&pavolia_lock, flags);
@@ -85,14 +87,14 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 }
 
 /**
- * pavolia_reine_setprop - Queues an Android property injection
+ * pavolia_reine_resetprop - Queues an Android property injection
  * @prop: Property name
  * @val: Property value
  * 
  * Injects it after a 30 second delay to ensure /system is mounted
  * and Android's init property service is running.
  */
-int pavolia_reine_setprop(const char *prop, const char *val)
+int pavolia_reine_resetprop(const char *prop, const char *val)
 {
 	struct pavolia_prop_job *job;
 
@@ -121,7 +123,7 @@ int pavolia_reine_setprop(const char *prop, const char *val)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(pavolia_reine_setprop);
+EXPORT_SYMBOL_GPL(pavolia_reine_resetprop);
 
 static int __init pavolia_reine_init(void)
 {

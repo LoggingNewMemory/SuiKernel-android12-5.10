@@ -757,8 +757,8 @@ CONFIG_YAMADA_DEV_IDENTIFICATION=y
 # Raco Override RC
 CONFIG_RACO_RC_OVERRIDE=y
 
-# Reine setprop
-CONFIG_PAVOLIA_REINE_SETPROP=y
+# Reine resetprop
+CONFIG_PAVOLIA_REINE_RESETPROP=y
 
 ###########################
 # Spoof Uname
