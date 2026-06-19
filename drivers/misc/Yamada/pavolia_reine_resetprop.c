@@ -42,21 +42,20 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	char *argv[] = { target_binary, "-c", cmd, NULL };
 	char *envp[] = { "HOME=/", "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", NULL };
 
-	spin_lock_irqsave(&pavolia_lock, flags);
-	if (list_empty(&pavolia_prop_list)) {
-		spin_unlock_irqrestore(&pavolia_lock, flags);
-		return;
-	}
-
 	/* Because 'su' swallows exit codes, we must explicitly check if the KSU payload is mounted */
 	f = filp_open("/data/adb/ksu/bin/resetprop", O_RDONLY, 0);
 	if (IS_ERR(f)) {
-		spin_unlock_irqrestore(&pavolia_lock, flags);
 		/* Not mounted yet, wait 2 seconds and try again */
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
 		return;
 	}
 	filp_close(f, NULL);
+
+	spin_lock_irqsave(&pavolia_lock, flags);
+	if (list_empty(&pavolia_prop_list)) {
+		spin_unlock_irqrestore(&pavolia_lock, flags);
+		return;
+	}
 
 	/* Peek at the first job to construct the test command */
 	job = list_first_entry(&pavolia_prop_list, struct pavolia_prop_job, list);
