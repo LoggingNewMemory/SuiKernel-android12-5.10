@@ -17,28 +17,14 @@
 extern int vm_swappiness;
 
 /*
- * Shadow atomic — Raco guards this value.
- * When a vendor service clobbers vm_swappiness, Raco resets the shadow
- * back to SPARXIE_SWAPPINESS; the apply_work then writes it to the real
- * vm_swappiness.
- *
- * NOTE: Raco's sniper polls every 5 s and resets the shadow if it
- * drifts. That reset is our "pulse". The kthread in Raco will set it
- * back; we don't need a separate monitoring thread here — the delayed
- * work fires once at boot, and Raco keeps the shadow in check.
- * If you want continuous re-application on vendor rollback, add a
- * periodic work (see inaho for that pattern).
+ * We simply define a callback function that Raco will execute every 5s.
+ * This actively pushes our value back into vm_swappiness, fighting vendor init!
  */
-static atomic_t sparxie_swappiness = ATOMIC_INIT(SPARXIE_SWAPPINESS);
-
-static void apply_swappiness_work_fn(struct work_struct *w)
+static void apply_swappiness_cb(void)
 {
-	int val = atomic_read(&sparxie_swappiness);
-
-	vm_swappiness = val;
-	pr_info("sparxie: vm_swappiness applied -> %d\n", val);
+	vm_swappiness = SPARXIE_SWAPPINESS;
+	pr_info("sparxie: vm_swappiness forcefully applied -> %d\n", SPARXIE_SWAPPINESS);
 }
-static DECLARE_DELAYED_WORK(apply_swappiness_work, apply_swappiness_work_fn);
 
 static int __init sparxie_swap_init(void)
 {
@@ -46,20 +32,12 @@ static int __init sparxie_swap_init(void)
 	vm_swappiness = SPARXIE_SWAPPINESS;
 	pr_info("sparxie: vm_swappiness set to %d\n", SPARXIE_SWAPPINESS);
 
-	/* 2. Hand long-term defence to Raco Sniper via the shadow atomic */
-	if (raco_register_rc_override(&sparxie_swappiness, SPARXIE_SWAPPINESS,
-				      "vm.swappiness") == 0) {
+	/* 2. Hand long-term defence to Raco Sniper via callback */
+	if (raco_register_rc_override(apply_swappiness_cb, "vm.swappiness") == 0) {
 		pr_info("sparxie: Swappiness defence delegated to Raco Engine\n");
 	} else {
 		pr_err("sparxie: Failed to hook into Raco Framework\n");
 	}
-
-	/*
-	 * Queue a delayed apply so the shadow's initial value is written to
-	 * vm_swappiness after any early-boot vendor services have run.
-	 * 30 s is enough for init.rc to finish on mt6833.
-	 */
-	schedule_delayed_work(&apply_swappiness_work, msecs_to_jiffies(30000));
 
 	return 0;
 }
@@ -67,16 +45,10 @@ static int __init sparxie_swap_init(void)
 static void __exit sparxie_swap_exit(void)
 {
 	/*
-	 * Cancel pending work BEFORE unregistering from Raco, so the work
-	 * fn cannot run after the module text is unmapped.
+	 * Unregister the callback from Raco so the Sniper thread does not
+	 * execute it after this module is freed.
 	 */
-	cancel_delayed_work_sync(&apply_swappiness_work);
-
-	/*
-	 * Unregister the shadow from Raco so the Sniper thread does not
-	 * dereference sparxie_swappiness after this module is freed.
-	 */
-	raco_unregister_rc_override(&sparxie_swappiness);
+	raco_unregister_rc_override(apply_swappiness_cb);
 
 	pr_info("sparxie: Swappiness tuner module detached.\n");
 }
