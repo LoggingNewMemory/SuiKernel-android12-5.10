@@ -20,8 +20,8 @@ config RACO_RC_OVERRIDE
     help 
 	  To counter the sysfs write by rogue vendor init.rc scripts during boot.
 
-config PAVOLIA_REINE_SETPROP
-	tristate "Pavolia Reine API prop tool"
+config PAVOLIA_REINE_RESETPROP
+	tristate "Pavolia Reine API resetprop tool"
 	default y
 	help
 	  Please see the required SELinux for this (See selinux.sh for more details)
@@ -57,5 +57,12 @@ config SCHEDUTIL_ENFORCER
 	 to sugov_ext (Which actually kinda same with schedutil). But because
 	 my eye I don't want to see it. Feel free to use this as reference if
 	 you want to change the governor with your own choice. Say Y or N
+
+config YAMADA_DEV_IDENTIFICATION
+  tristate "Identification of this kernel developer IS"
+  help
+   This is actually to test PAVOLIA_REINE_SETPROP but eh, it would be a
+   good Identification that this kernel is make by me anyway. This will
+   be also an example usage of PAVOLIA_REINE_SETPROP API
 
 endmenu
