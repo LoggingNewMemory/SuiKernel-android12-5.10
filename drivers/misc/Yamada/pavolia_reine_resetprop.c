@@ -111,7 +111,7 @@ int pavolia_reine_resetprop(const char *prop, const char *val)
 	/* * Kick the single worker thread. It will poll every 2s until success,
 	 * then blast through the entire queue of 100+ items instantly.
 	 */
-	schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(5000));
+	schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(45000));
 
 	return 0;
 }
