@@ -36,8 +36,7 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	struct file *f;
 	
 	/* Sui-chan's Interrogation Variables! 🪓☄️ */
-	char *argv[4];
-	char cmd[512]; 
+	char *argv[6];
 	char *envp[] = { 
 		"HOME=/", 
 		"PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", 
@@ -56,6 +55,7 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	pr_info("pavolia_reine: Android property service online! Processing queue...\n");
 
 	while (1) {
+		int ret;
 		spin_lock_irqsave(&pavolia_lock, flags);
 		if (list_empty(&pavolia_prop_list)) {
 			spin_unlock_irqrestore(&pavolia_lock, flags);
@@ -65,21 +65,17 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		list_del(&job->list);
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 
-		/* Sui-chan's Golden Axe! Log everything to dmesg! */
-		snprintf(cmd, sizeof(cmd), 
-			 "echo 'pavolia_reine: [DEBUG] Running ksud for %s...' > /dev/kmsg; "
-			 "/data/adb/ksud resetprop -n \"%s\" \"%s\" > /dev/kmsg 2>&1; "
-			 "echo 'pavolia_reine: [DEBUG] ksud exit code: $?' > /dev/kmsg", 
-			 job->prop, job->prop, job->val);
-
-		argv[0] = "/system/bin/sh";
-		argv[1] = "-c";
-		argv[2] = cmd;
-		argv[3] = NULL;
+		/* Direct execution to bypass /system/bin/sh SELinux constraints */
+		argv[0] = "/data/adb/ksud";
+		argv[1] = "resetprop";
+		argv[2] = "-n";
+		argv[3] = job->prop;
+		argv[4] = job->val;
+		argv[5] = NULL;
 		
-		call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 		
-		pr_info("pavolia_reine: Injected -> %s = %s\n", job->prop, job->val);
+		pr_info("pavolia_reine: ksud exit code %d, Injected -> %s = %s\n", ret, job->prop, job->val);
 		kfree(job);
 	}
 	
