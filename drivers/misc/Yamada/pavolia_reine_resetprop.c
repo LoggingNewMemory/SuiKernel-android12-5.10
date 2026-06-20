@@ -35,8 +35,9 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	unsigned long flags;
 	struct file *f;
 	int ret;
-
-	/* Kobo's Magic Environment Variables! Wajib buat Android Binaries 🪄 */
+	
+	/* Sui-chan's Array Declaration at the TOP! No more C90 errors! ☄️ */
+	char *argv[6];
 	char *envp[] = { 
 		"HOME=/", 
 		"PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", 
@@ -62,8 +63,14 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	spin_unlock_irqrestore(&pavolia_lock, flags);
 
 	/* Tembak ksud langsung pake Array, bebas bug kutip/spasi! 🔫 */
-	char *test_argv[] = { "/data/adb/ksud", "resetprop", "-n", job->prop, job->val, NULL };
-	ret = call_usermodehelper(test_argv[0], test_argv, envp, UMH_WAIT_PROC);
+	argv[0] = "/data/adb/ksud";
+	argv[1] = "resetprop";
+	argv[2] = "-n";
+	argv[3] = job->prop;
+	argv[4] = job->val;
+	argv[5] = NULL;
+	
+	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 
 	if (ret != 0) {
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
@@ -82,9 +89,10 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		list_del(&job->list);
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 
-		/* Bikin argv baru buat tiap iterasi */
-		char *loop_argv[] = { "/data/adb/ksud", "resetprop", "-n", job->prop, job->val, NULL };
-		call_usermodehelper(loop_argv[0], loop_argv, envp, UMH_WAIT_PROC);
+		/* Re-use argv, just update the property values! */
+		argv[3] = job->prop;
+		argv[4] = job->val;
+		call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 		
 		pr_info("pavolia_reine: Injected -> %s = %s\n", job->prop, job->val);
 		kfree(job);
@@ -97,14 +105,12 @@ static void pavolia_reine_work_fn(struct work_struct *work)
  * pavolia_reine_resetprop - Queues an Android property injection
  * @prop: Property name
  * @val: Property value
- * 
- * Injects it after a 30 second delay to ensure /system is mounted
+ * * Injects it after a 5 second delay to ensure /system is mounted
  * and Android's init property service is running.
  */
 int pavolia_reine_resetprop(const char *prop, const char *val)
 {
 	struct pavolia_prop_job *job;
-
 	unsigned long flags;
 
 	if (!prop || !val)
@@ -122,8 +128,7 @@ int pavolia_reine_resetprop(const char *prop, const char *val)
 	list_add_tail(&job->list, &pavolia_prop_list);
 	spin_unlock_irqrestore(&pavolia_lock, flags);
 
-	/* 
-	 * Kick the single worker thread. It will poll every 2s until success,
+	/* * Kick the single worker thread. It will poll every 2s until success,
 	 * then blast through the entire queue of 100+ items instantly.
 	 */
 	schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(5000));
