@@ -65,11 +65,14 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		list_del(&job->list);
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 
-		char *argv[] = { "/data/adb/ksud", "resetprop", job->prop, job->val, NULL };
-		char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/system/sbin:/system/bin:/system/xbin", NULL };
+		argv[0] = "/data/adb/ksud";
+		argv[1] = "resetprop";
+		argv[2] = job->prop;
+		argv[3] = job->val;
+		argv[4] = NULL;
 		
 		/* Direct execution to bypass /system/bin/sh SELinux constraints */
-		ret = call_usermodehelper("/data/adb/ksud", argv, envp, UMH_WAIT_PROC);
+		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 		
 		pr_info("pavolia_reine: ksud exit code %d, Injected -> %s = %s\n", ret, job->prop, job->val);
 		kfree(job);
