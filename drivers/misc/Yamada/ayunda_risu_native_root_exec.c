@@ -16,6 +16,7 @@
  */
 int ayunda_risu_exec(const char *cmd)
 {
+	int ret;
 	char *argv[] = { "/system/bin/sh", "-c", (char *)cmd, NULL };
 	char *envp[] = { 
 		"HOME=/", 
@@ -24,7 +25,6 @@ int ayunda_risu_exec(const char *cmd)
 		"ANDROID_DATA=/data",
 		NULL 
 	};
-	int ret;
 
 	if (!cmd)
 		return -EINVAL;
