@@ -36,18 +36,17 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 	struct file *f;
 	int ret;
 
-	char *target_binary = "/system/bin/sh";
-	char cmd[512];
+	/* Kobo's Magic Environment Variables! Wajib buat Android Binaries 🪄 */
+	char *envp[] = { 
+		"HOME=/", 
+		"PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", 
+		"ANDROID_ROOT=/system", 
+		"ANDROID_DATA=/data", 
+		NULL 
+	};
 
-	char *argv[] = { target_binary, "-c", cmd, NULL };
-	char *envp[] = { "HOME=/", "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin", NULL };
-
-	/* Because 'su' swallows exit codes, we must explicitly check if the KSU payload is mounted.
-	 * We check for the main 'ksud' binary instead of 'resetprop' because 'resetprop' is a symlink,
-	 * and the kernel domain lacks lnk_file read permissions, triggering an SELinux denial. */
 	f = filp_open("/data/adb/ksud", O_RDONLY, 0);
 	if (IS_ERR(f)) {
-		/* Not mounted yet, wait 2 seconds and try again */
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
 		return;
 	}
@@ -59,23 +58,19 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		return;
 	}
 
-	/* Peek at the first job to construct the test command */
 	job = list_first_entry(&pavolia_prop_list, struct pavolia_prop_job, list);
 	spin_unlock_irqrestore(&pavolia_lock, flags);
 
-	snprintf(cmd, sizeof(cmd), "/data/adb/ksud resetprop -n %s \"%s\"", job->prop, job->val);
-
-	/* Execute as root from kernel space */
-	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+	/* Tembak ksud langsung pake Array, bebas bug kutip/spasi! 🔫 */
+	char *test_argv[] = { "/data/adb/ksud", "resetprop", "-n", job->prop, job->val, NULL };
+	ret = call_usermodehelper(test_argv[0], test_argv, envp, UMH_WAIT_PROC);
 
 	if (ret != 0) {
-		/* Failed to execute sh. Retry in 2s. */
 		schedule_delayed_work(&pavolia_dwork, msecs_to_jiffies(2000));
 		return;
 	}
 
-	/* If we succeeded, Android is fully awake! Process the ENTIRE queue sequentially using the found binary */
-	pr_info("pavolia_reine: Android property service online via sh+su. Processing queue...\n");
+	pr_info("pavolia_reine: Android property service online! Processing queue...\n");
 
 	while (1) {
 		spin_lock_irqsave(&pavolia_lock, flags);
@@ -87,10 +82,9 @@ static void pavolia_reine_work_fn(struct work_struct *work)
 		list_del(&job->list);
 		spin_unlock_irqrestore(&pavolia_lock, flags);
 
-		snprintf(cmd, sizeof(cmd), "/data/adb/ksud resetprop -n %s \"%s\"", job->prop, job->val);
-		
-		/* We don't check return value here because we already proved it works above */
-		call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+		/* Bikin argv baru buat tiap iterasi */
+		char *loop_argv[] = { "/data/adb/ksud", "resetprop", "-n", job->prop, job->val, NULL };
+		call_usermodehelper(loop_argv[0], loop_argv, envp, UMH_WAIT_PROC);
 		
 		pr_info("pavolia_reine: Injected -> %s = %s\n", job->prop, job->val);
 		kfree(job);
