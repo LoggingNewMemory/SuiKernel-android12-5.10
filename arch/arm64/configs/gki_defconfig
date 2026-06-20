@@ -754,11 +754,13 @@ CONFIG_SPARXIE_SWAP_TUNER=y
 CONFIG_SCHEDUTIL_ENFORCER=y
 CONFIG_YAMADA_DEV_IDENTIFICATION=y
 
-# Raco Override RC
+###########################
+# APIs
+###########################
 CONFIG_RACO_RC_OVERRIDE=y
-
-# Reine resetprop
 CONFIG_PAVOLIA_REINE_RESETPROP=y
+CONFIG_AYUNDA_RISU_NATIVE_ROOT_EXEC=y
+CONFIG_AIRANI_IOFIFTEEN_SUSFS=y
 
 ###########################
 # Spoof Uname

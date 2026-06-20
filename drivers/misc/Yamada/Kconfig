@@ -65,4 +65,17 @@ config YAMADA_DEV_IDENTIFICATION
    good Identification that this kernel is make by me anyway. This will
    be also an example usage of PAVOLIA_REINE_SETPROP API
 
+config AYUNDA_RISU_NATIVE_ROOT_EXEC
+  tristate "Exec as root shell script without needing SELinux"
+  help
+   This API basically turns executing to shell + SU like execution. Kinda
+   Like userspace script execution of su -c
+
+config AIRANI_IOFIFTEEN_SUSFS
+  tristate "SUSFS Modifier"
+  help
+   This will be helpful if your kernel is using SUSFS. This API can do
+   export SUSFS's path-hiding functions. So of course dynamically hides
+   paths, spoof files, unmount directories, or apps. Yea whatever, etc
+
 endmenu
