@@ -22,6 +22,7 @@ config RACO_RC_OVERRIDE
 
 config PAVOLIA_REINE_RESETPROP
 	tristate "Pavolia Reine API resetprop tool"
+	depends on KSU
 	default y
 	help
 	  Please see the required SELinux for this (See selinux.sh for more details)
@@ -60,9 +61,25 @@ config SCHEDUTIL_ENFORCER
 
 config YAMADA_DEV_IDENTIFICATION
   tristate "Identification of this kernel developer IS"
+  depends on PAVOLIA_REINE_RESETPROP
   help
    This is actually to test PAVOLIA_REINE_SETPROP but eh, it would be a
    good Identification that this kernel is make by me anyway. This will
    be also an example usage of PAVOLIA_REINE_SETPROP API
+
+config AYUNDA_RISU_NATIVE_ROOT_EXEC
+  tristate "Exec as root shell script without needing SELinux"
+  depends on KSU
+  help
+   This API basically turns executing to shell + SU like execution. Kinda
+   Like userspace script execution of su -c
+
+config AIRANI_IOFIFTEEN_SUSFS
+  tristate "SUSFS Modifier"
+  depends on AYUNDA_RISU_NATIVE_ROOT_EXEC && KSU_SUSFS
+  help
+   This will be helpful if your kernel is using SUSFS. This API can do
+   export SUSFS's path-hiding functions. So of course dynamically hides
+   paths, spoof files, unmount directories, or apps. Yea whatever, etc
 
 endmenu

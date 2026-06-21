@@ -11,3 +11,5 @@ obj-$(CONFIG_YAMADA_GAMING_BOOST) += yamada_gaming_boost.o
 obj-$(CONFIG_YAMADA_TENEBRION) += tenebrion.o
 obj-$(CONFIG_SCHEDUTIL_ENFORCER) += schedutil_enforcer.o
 obj-$(CONFIG_YAMADA_DEV_IDENTIFICATION) += yamada_dev_identification.o
+obj-$(CONFIG_AYUNDA_RISU_NATIVE_ROOT_EXEC) += ayunda_risu_native_root_exec.o
+obj-$(CONFIG_AIRANI_IOFIFTEEN_SUSFS) += airani_iofifteen_susfs.o

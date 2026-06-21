@@ -23,6 +23,7 @@
 #include <linux/pid.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/raco_override.h>
+#include <linux/ayunda_risu_native_root_exec.h>
 
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
@@ -75,46 +76,30 @@ static const char * const audio_threads[] = {
 };
 
 /* ------------------------------------------------------------------ */
-/* VFS helper                                                           */
-/* ------------------------------------------------------------------ */
-
-static int inaho_write_file(const char *path, const char *buf)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_WRONLY, 0);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-
-	ret = kernel_write(f, buf, strlen(buf), &pos);
-	filp_close(f, NULL);
-
-	return ret < 0 ? ret : 0;
-}
-
-/* ------------------------------------------------------------------ */
 /* Feature 1 — Dynamic CPUSet override                                 */
 /* ------------------------------------------------------------------ */
 
 static void inaho_execute_cpuset_override(void)
 {
 	int total_cores = num_possible_cpus();
+	char cmd[128];
 
 	snprintf(dynamic_cpu_mask, sizeof(dynamic_cpu_mask),
 		 "0-%d", total_cores - 1);
 
 	pr_info("inaho: Dynamic core range: %s\n", dynamic_cpu_mask);
 
-	if (inaho_write_file("/dev/cpuset/foreground/cpus", dynamic_cpu_mask) == 0)
-		pr_info("inaho: foreground cpuset -> %s\n", dynamic_cpu_mask);
+	snprintf(cmd, sizeof(cmd), "echo %s > /dev/cpuset/foreground/cpus", dynamic_cpu_mask);
+	ayunda_risu_exec(cmd);
+	pr_info("inaho: foreground cpuset -> %s\n", dynamic_cpu_mask);
 
-	if (inaho_write_file("/dev/cpuset/top-app/cpus", dynamic_cpu_mask) == 0)
-		pr_info("inaho: top-app cpuset -> %s\n", dynamic_cpu_mask);
+	snprintf(cmd, sizeof(cmd), "echo %s > /dev/cpuset/top-app/cpus", dynamic_cpu_mask);
+	ayunda_risu_exec(cmd);
+	pr_info("inaho: top-app cpuset -> %s\n", dynamic_cpu_mask);
 
-	if (inaho_write_file("/dev/cpuset/boost-app/cpus", dynamic_cpu_mask) == 0)
-		pr_info("inaho: boost-app cpuset -> %s\n", dynamic_cpu_mask);
+	snprintf(cmd, sizeof(cmd), "echo %s > /dev/cpuset/boost-app/cpus", dynamic_cpu_mask);
+	ayunda_risu_exec(cmd);
+	pr_info("inaho: boost-app cpuset -> %s\n", dynamic_cpu_mask);
 }
 
 /* ------------------------------------------------------------------ */
