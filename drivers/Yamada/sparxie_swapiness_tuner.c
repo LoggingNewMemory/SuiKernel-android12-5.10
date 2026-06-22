@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /*
  * sparxie_swapiness_tuner.c
  * Sparxie Swappiness Tuner — Delegated to Raco Engine API
@@ -56,6 +56,6 @@ static void __exit sparxie_swap_exit(void)
 module_init(sparxie_swap_init);
 module_exit(sparxie_swap_exit);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Sparxie Swappiness Tuner — Hooked to Raco Override Engine");

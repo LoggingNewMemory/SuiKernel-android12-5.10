@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /*
  * drivers/misc/pavolia_reine_resetprop.c
  * Pavolia Reine Setprop Engine - Inject Android properties from kernel
@@ -45,6 +45,6 @@ static int __init pavolia_reine_init(void)
 }
 late_initcall(pavolia_reine_init);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Pavolia Reine Android Property Injector");

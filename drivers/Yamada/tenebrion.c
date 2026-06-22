@@ -1,5 +1,5 @@
 // tenebrion.c
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 // Tenebrion — Screen state based CPU frequency throttler + cpuset limiter
 // Author: Kanagawa Yamada
 
@@ -14,8 +14,6 @@
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
-#include <linux/ayunda_risu_native_root_exec.h>
-#include <linux/raco_override.h>
 
 #define POLL_INTERVAL_MS    3000
 #define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
@@ -77,6 +75,24 @@ static int tenebrion_read_file(const char *path, char *buf, size_t size)
     }
 
     return ret;
+}
+
+static int tenebrion_write_file(const char *path, const char *buf)
+{
+    struct file *f;
+    loff_t pos = 0;
+    int ret;
+
+    f = filp_open(path, O_WRONLY, 0);
+    if (IS_ERR(f)) {
+        pr_warn("tenebrion: cannot open %s for write\n", path);
+        return -1;
+    }
+
+    ret = kernel_write(f, buf, strlen(buf), &pos);
+    filp_close(f, NULL);
+
+    return ret > 0 ? 0 : -1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -151,27 +167,26 @@ static int tenebrion_get_screen_state(void)
 
 static void tenebrion_cpuset_restrict(void)
 {
-    ayunda_risu_exec("echo " CPUSET_SCREEN_OFF " > " CPUSET_BG_PATH);
-    ayunda_risu_exec("echo " CPUSET_SCREEN_OFF " > " CPUSET_SYSBG_PATH);
-    pr_info("tenebrion: background & system-background cpusets restricted via Risu\n");
+    if (tenebrion_write_file(CPUSET_BG_PATH, CPUSET_SCREEN_OFF) == 0)
+        pr_info("tenebrion: background cpuset → %s\n", CPUSET_SCREEN_OFF);
+
+    if (tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF) == 0)
+        pr_info("tenebrion: system-background cpuset → %s\n", CPUSET_SCREEN_OFF);
 }
 
 static void tenebrion_cpuset_restore(void)
 {
     char dynamic_cpu_mask[32];
     int total_cores = num_possible_cpus();
-    char cmd[128];
 
     /* Forge the dynamic mask (e.g., "0-7" for an 8-core SoC) */
     snprintf(dynamic_cpu_mask, sizeof(dynamic_cpu_mask), "0-%d", total_cores - 1);
 
-    snprintf(cmd, sizeof(cmd), "echo %s > %s", dynamic_cpu_mask, CPUSET_BG_PATH);
-    ayunda_risu_exec(cmd);
+    if (tenebrion_write_file(CPUSET_BG_PATH, dynamic_cpu_mask) == 0)
+        pr_info("tenebrion: background cpuset restored → %s\n", dynamic_cpu_mask);
 
-    snprintf(cmd, sizeof(cmd), "echo %s > %s", dynamic_cpu_mask, CPUSET_SYSBG_PATH);
-    ayunda_risu_exec(cmd);
-
-    pr_info("tenebrion: background & system-background cpusets restored via Risu → %s\n", dynamic_cpu_mask);
+    if (tenebrion_write_file(CPUSET_SYSBG_PATH, dynamic_cpu_mask) == 0)
+        pr_info("tenebrion: system-background cpuset restored → %s\n", dynamic_cpu_mask);
 }
 
 /* ------------------------------------------------------------------ */
@@ -306,21 +321,17 @@ static void tenebrion_on_screen_off(void)
 {
     tenebrion_set_min_freq();
     tenebrion_cpuset_restrict();
-    
-    raco_register_rc_override(tenebrion_cpuset_restrict, "tenebrion_bg_cpuset");
-    
     is_screen_off = true;
-    pr_info("tenebrion: screen OFF → CPUs throttled + cpuset restricted (Raco engaged)\n");
+    pr_info("tenebrion: screen OFF → CPUs throttled + cpuset restricted "
+            "(online CPUs: %u)\n", num_online_cpus());
 }
 
 static void tenebrion_on_screen_on(void)
 {
-    raco_unregister_rc_override(tenebrion_cpuset_restrict);
-    
     tenebrion_restore_freq();
     tenebrion_cpuset_restore();
     is_screen_off = false;
-    pr_info("tenebrion: screen ON → CPUs restored + cpuset restored (Raco disengaged)\n");
+    pr_info("tenebrion: screen ON → CPUs restored + cpuset restored\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -424,6 +435,6 @@ static void __exit tenebrion_exit(void)
 module_init(tenebrion_init);
 module_exit(tenebrion_exit);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Tenebrion: Screen state based CPU frequency throttler + cpuset limiter");
