@@ -22,9 +22,6 @@
 #include <linux/atomic.h>
 #include <linux/pid.h>
 #include <uapi/linux/sched/types.h>
-#include <linux/raco_override.h>
-
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 #define ENGAGE_DELAY_MS     20000
 #define AUDIO_SCAN_MS        5000
@@ -53,9 +50,6 @@ static struct task_struct *inaho_thread;
  */
 #define AUDIO_SCAN_MS 5000
 
-/* Enlarged to 32 bytes — handles ≥ 10-core SoCs safely */
-static char dynamic_cpu_mask[32];
-
 /* ------------------------------------------------------------------ */
 /* Audio thread name table                                              */
 /* ------------------------------------------------------------------ */
@@ -75,50 +69,7 @@ static const char * const audio_threads[] = {
 };
 
 /* ------------------------------------------------------------------ */
-/* VFS helper                                                           */
-/* ------------------------------------------------------------------ */
-
-static int inaho_write_file(const char *path, const char *buf)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_WRONLY, 0);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-
-	ret = kernel_write(f, buf, strlen(buf), &pos);
-	filp_close(f, NULL);
-
-	return ret < 0 ? ret : 0;
-}
-
-/* ------------------------------------------------------------------ */
-/* Feature 1 — Dynamic CPUSet override                                 */
-/* ------------------------------------------------------------------ */
-
-static void inaho_execute_cpuset_override(void)
-{
-	int total_cores = num_possible_cpus();
-
-	snprintf(dynamic_cpu_mask, sizeof(dynamic_cpu_mask),
-		 "0-%d", total_cores - 1);
-
-	pr_info("inaho: Dynamic core range: %s\n", dynamic_cpu_mask);
-
-	if (inaho_write_file("/dev/cpuset/foreground/cpus", dynamic_cpu_mask) == 0)
-		pr_info("inaho: foreground cpuset -> %s\n", dynamic_cpu_mask);
-
-	if (inaho_write_file("/dev/cpuset/top-app/cpus", dynamic_cpu_mask) == 0)
-		pr_info("inaho: top-app cpuset -> %s\n", dynamic_cpu_mask);
-
-	if (inaho_write_file("/dev/cpuset/boost-app/cpus", dynamic_cpu_mask) == 0)
-		pr_info("inaho: boost-app cpuset -> %s\n", dynamic_cpu_mask);
-}
-
-/* ------------------------------------------------------------------ */
-/* Feature 2 — SCHED_FIFO boost for audio threads (RCU-safe)          */
+/* Feature 1 — SCHED_FIFO boost for audio threads (RCU-safe)          */
 /* ------------------------------------------------------------------ */
 
 static void inaho_boost_audio_threads(void)
@@ -181,7 +132,7 @@ static void inaho_boost_audio_threads(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Feature 3 — PM QoS latency guard                                    */
+/* Feature 2 — PM QoS latency guard                                    */
 /* ------------------------------------------------------------------ */
 
 static void inaho_pm_qos_engage(void)
@@ -204,36 +155,9 @@ static int inaho_worker(void *data)
 	msleep(ENGAGE_DELAY_MS);
 
 	inaho_pm_qos_engage();
-	inaho_execute_cpuset_override();
 
 	while (!kthread_should_stop()) {
 		inaho_boost_audio_threads();
-
-		/*
-		 * Watchdog: read the live cpuset value and re-enforce
-		 * if a vendor service rolled it back without triggering
-		 * Raco (e.g. direct sysfs write after Raco's window).
-		 */
-		{
-			struct file *f = filp_open("/dev/cpuset/foreground/cpus",
-						   O_RDONLY, 0);
-			if (!IS_ERR(f)) {
-				char current_mask[32] = {0};
-				char *cleaned;
-				loff_t pos = 0;
-
-				kernel_read(f, current_mask,
-					    sizeof(current_mask) - 1, &pos);
-				filp_close(f, NULL);
-
-				cleaned = strim(current_mask);
-				if (strstr(cleaned, dynamic_cpu_mask) == NULL) {
-					pr_info("inaho: Watchdog caught vendor rollback ('%s')! Re-enforcing.\n",
-						cleaned);
-					inaho_execute_cpuset_override();
-				}
-			}
-		}
 
 		msleep_interruptible(AUDIO_SCAN_MS);
 	}
@@ -252,16 +176,10 @@ static int __init inaho_audio_enhance_init(void)
 		return 0;
 	}
 
-	if (raco_register_rc_override(inaho_execute_cpuset_override, "audio.cpuset_lock") == 0)
-		pr_info("inaho: CPUSet guard hooked to Raco Global Sniper\n");
-	else
-		pr_warn("inaho: Raco hook failed, continuing without it\n");
-
 	inaho_thread = kthread_run(inaho_worker, NULL, "inaho_audio");
 	if (IS_ERR(inaho_thread)) {
 		pr_err("inaho: failed to start thread: %ld\n",
 		       PTR_ERR(inaho_thread));
-		raco_unregister_rc_override(inaho_execute_cpuset_override);
 		return PTR_ERR(inaho_thread);
 	}
 
@@ -273,12 +191,6 @@ static void __exit inaho_audio_enhance_exit(void)
 {
 	if (inaho_thread)
 		kthread_stop(inaho_thread);
-
-	/*
-	 * Unregister AFTER stopping the thread so the worker cannot race
-	 * with Raco's sniper during teardown.
-	 */
-	raco_unregister_rc_override(inaho_execute_cpuset_override);
 
 	if (pm_qos_active) {
 		cpu_latency_qos_remove_request(&inaho_pm_qos);
@@ -293,4 +205,4 @@ module_exit(inaho_audio_enhance_exit);
 
 MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Ochinai Inaho Audio — Raco API + Infinite Cores Support");
+MODULE_DESCRIPTION("Ochinai Inaho Audio");
