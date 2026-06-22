@@ -34,4 +34,4 @@ module_init(ayunda_risu_setprop);
 
 MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Spoof some props for reduced root detection")
+MODULE_DESCRIPTION("Spoof some props for reduced root detection");
