@@ -76,4 +76,11 @@ config AYUNDA_RISU_SAFEPROP
     Google integrity, this only help reduce detection of banking apps 
     on your devices
 
+config AIRANI_IOFIFTEEN_CPUSET
+  tristate "Maximum CPUSet tweaks"
+  depends on RACO_RC_OVERRIDE
+  help
+    Some devices not set max CPU cores to the max, to fix this. Let's
+    just make this. This also helpful if PowerHAL try to change it -_-
+
 endmenu

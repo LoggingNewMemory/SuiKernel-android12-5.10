@@ -25,7 +25,6 @@
  * scheduler already won't run heavy foreground work while the
  * screen is off, and touching those sets causes jank on wake.
  */
-#define CPUSET_BG_PATH      "/dev/cpuset/background/cpus"
 #define CPUSET_SYSBG_PATH   "/dev/cpuset/system-background/cpus"
 
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
@@ -163,30 +162,34 @@ static int tenebrion_get_screen_state(void)
  * CPU0 only; everything else stays as-is so foreground/top-app are
  * not affected.
  */
-#define CPUSET_SCREEN_OFF   "0"
+#define CPUSET_SCREEN_OFF   "0\n"
+
+static char saved_sysbg_cpus[32] = "";
 
 static void tenebrion_cpuset_restrict(void)
 {
-    if (tenebrion_write_file(CPUSET_BG_PATH, CPUSET_SCREEN_OFF) == 0)
-        pr_info("tenebrion: background cpuset → %s\n", CPUSET_SCREEN_OFF);
+    /* Save current mask before overriding */
+    tenebrion_read_file(CPUSET_SYSBG_PATH, saved_sysbg_cpus, sizeof(saved_sysbg_cpus));
 
     if (tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF) == 0)
-        pr_info("tenebrion: system-background cpuset → %s\n", CPUSET_SCREEN_OFF);
+        pr_info("tenebrion: system-background cpuset → 0\n");
 }
 
 static void tenebrion_cpuset_restore(void)
 {
-    char dynamic_cpu_mask[32];
+    char sysbg_buf[32];
+    char fallback_mask[32];
     int total_cores = num_possible_cpus();
 
-    /* Forge the dynamic mask (e.g., "0-7" for an 8-core SoC) */
-    snprintf(dynamic_cpu_mask, sizeof(dynamic_cpu_mask), "0-%d", total_cores - 1);
+    /* Forge the dynamic mask just in case the read failed (e.g. "0-7", "0-3") */
+    snprintf(fallback_mask, sizeof(fallback_mask), "0-%d", total_cores - 1);
 
-    if (tenebrion_write_file(CPUSET_BG_PATH, dynamic_cpu_mask) == 0)
-        pr_info("tenebrion: background cpuset restored → %s\n", dynamic_cpu_mask);
+    /* tenebrion_read_file stripped the newline, so we must add it back */
+    snprintf(sysbg_buf, sizeof(sysbg_buf), "%s\n", 
+             saved_sysbg_cpus[0] ? saved_sysbg_cpus : fallback_mask);
 
-    if (tenebrion_write_file(CPUSET_SYSBG_PATH, dynamic_cpu_mask) == 0)
-        pr_info("tenebrion: system-background cpuset restored → %s\n", dynamic_cpu_mask);
+    if (tenebrion_write_file(CPUSET_SYSBG_PATH, sysbg_buf) == 0)
+        pr_info("tenebrion: system-background cpuset restored → %s", sysbg_buf);
 }
 
 /* ------------------------------------------------------------------ */

@@ -12,3 +12,4 @@ obj-$(CONFIG_YAMADA_TENEBRION) += tenebrion.o
 obj-$(CONFIG_SCHEDUTIL_ENFORCER) += schedutil_enforcer.o
 obj-$(CONFIG_YAMADA_DEV_IDENTIFICATION) += yamada_dev_identification.o
 obj-$(CONFIG_AYUNDA_RISU_SAFEPROP) += ayunda_risu_safeprop.o
+obj-$(CONFIG_AIRANI_IOFIFTEEN_CPUSET) += airani_iofifteen_cpuset.o
