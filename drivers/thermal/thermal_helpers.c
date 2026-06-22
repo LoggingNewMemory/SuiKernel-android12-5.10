@@ -87,11 +87,13 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 	int crit_temp = INT_MAX;
 	enum thermal_trip_type type;
 
+#ifdef CONFIG_YAMADA_ANYA_THERMAL
 	// Modification of Anya Thermal. Spoof to 30 Celcius
 	if (temp) {
 		*temp = 30000;
 		return 0;
 	}
+#endif
 
 	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
 		goto exit;
