@@ -48,8 +48,9 @@ static void yamada_vh_map_util_freq_probe(void *data, unsigned long util,
 	/* If the screen is being touched, artificially inflate util by 50% */
 	if (active_boost && policy && next_freq && need_freq_update) {
 		util += util / 2;
+		if (util > cap)
+			util = cap;
 		*next_freq = map_util_freq(util, freq, cap);
-		*need_freq_update = true;
 	}
 }
 

@@ -10,7 +10,7 @@
 #include <linux/pm_qos.h>
 
 #define BOOST_DELAY_MS   10000
-#define REVERT_DELAY_MS  60000
+#define REVERT_DELAY_MS  10000
 
 static bool sandevistan_enabled = true;
 module_param(sandevistan_enabled, bool, 0644);
