@@ -177,6 +177,7 @@ static void tenebrion_cpuset_restrict(void)
         pr_info("tenebrion: background cpuset → 0\n");
 
     if (tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF) == 0)
+        pr_info("tenebrion: system-background cpuset → 0\n");
 }
 
 static void tenebrion_cpuset_restore(void)
