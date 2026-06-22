@@ -4,13 +4,14 @@
 
 #include <linux/module.h>
 #include <linux/cpufreq.h>
+#include <linux/sched/cpufreq.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/input.h>
 #include <trace/hooks/sched.h> // Required for Android Vendor Hooks
 
-#define BOOST_DURATION_MS   1000
+#define BOOST_DURATION_MS   100
 
 static bool yamada_boost_enabled = true;
 module_param(yamada_boost_enabled, bool, 0644);
@@ -37,19 +38,17 @@ static void yamada_vh_map_util_freq_probe(void *data, unsigned long util,
 					  struct cpufreq_policy *policy,
 					  bool *need_freq_update)
 {
-	unsigned long flags;
 	bool active_boost;
 
 	if (!yamada_boost_enabled)
 		return;
 
-	spin_lock_irqsave(&boost_lock, flags);
-	active_boost = is_boosted;
-	spin_unlock_irqrestore(&boost_lock, flags);
+	active_boost = READ_ONCE(is_boosted);
 
-	/* If the screen is being touched, bypass normal math and force maxfreq instantly! */
+	/* If the screen is being touched, artificially inflate util by 50% */
 	if (active_boost && policy && next_freq && need_freq_update) {
-		*next_freq = policy->cpuinfo.max_freq;
+		util += util / 2;
+		*next_freq = map_util_freq(util, freq, cap);
 		*need_freq_update = true;
 	}
 }
@@ -58,7 +57,7 @@ static void do_boost_off(struct work_struct *work) {
 	unsigned long flags;
 
 	spin_lock_irqsave(&boost_lock, flags);
-	is_boosted = false;
+	WRITE_ONCE(is_boosted, false);
 	spin_unlock_irqrestore(&boost_lock, flags);
 
 	pr_info("yamada_gaming_boost: touch boost OFF (Letting schedutil handle math again)\n");
@@ -72,7 +71,7 @@ static void kobo_trigger_boost(void) {
 
 	spin_lock_irqsave(&boost_lock, flags);
 	if (!is_boosted) {
-		is_boosted = true;
+		WRITE_ONCE(is_boosted, true);
 		pr_info("yamada_gaming_boost: touch boost ON (Vendor Hook Intercept Active)\n");
 	}
 	spin_unlock_irqrestore(&boost_lock, flags);
