@@ -58,21 +58,21 @@ static void airani_execute_cpuset_override(void)
 		 "0-%d", total_cores - 1);
 	snprintf(write_buf, sizeof(write_buf), "%s\n", dynamic_cpu_mask);
 
-	pr_info("airani: Dynamic core range: %s\n", dynamic_cpu_mask);
+	pr_info("iofi: Dynamic core range: %s\n", dynamic_cpu_mask);
 
 	if (airani_write_file("/dev/cpuset/foreground/cpus", write_buf) == 0)
-		pr_info("airani: foreground cpuset -> %s\n", dynamic_cpu_mask);
+		pr_info("iofi: foreground cpuset -> %s\n", dynamic_cpu_mask);
 
 	if (airani_write_file("/dev/cpuset/top-app/cpus", write_buf) == 0)
-		pr_info("airani: top-app cpuset -> %s\n", dynamic_cpu_mask);
+		pr_info("iofi: top-app cpuset -> %s\n", dynamic_cpu_mask);
 
 	if (airani_write_file("/dev/cpuset/boost-app/cpus", write_buf) == 0)
-		pr_info("airani: boost-app cpuset -> %s\n", dynamic_cpu_mask);
+		pr_info("iofi: boost-app cpuset -> %s\n", dynamic_cpu_mask);
 }
 
 static int airani_worker(void *data)
 {
-	pr_info("airani: standing by — engaging in %d ms\n", ENGAGE_DELAY_MS);
+	pr_info("iofi: standing by — engaging in %d ms\n", ENGAGE_DELAY_MS);
 	msleep(ENGAGE_DELAY_MS);
 
 	airani_execute_cpuset_override();
@@ -97,7 +97,7 @@ static int airani_worker(void *data)
 
 				cleaned = strim(current_mask);
 				if (strstr(cleaned, dynamic_cpu_mask) == NULL) {
-					pr_info("airani: Watchdog caught vendor rollback ('%s')! Re-enforcing.\n",
+					pr_info("iofi: Watchdog caught vendor rollback ('%s')! Re-enforcing.\n",
 						cleaned);
 					airani_execute_cpuset_override();
 				}
@@ -113,24 +113,24 @@ static int airani_worker(void *data)
 static int __init airani_cpuset_init(void)
 {
 	if (!airani_enabled) {
-		pr_info("airani: disabled via module param\n");
+		pr_info("iofi: disabled via module param\n");
 		return 0;
 	}
 
 	if (raco_register_rc_override(airani_execute_cpuset_override, "airani.cpuset_lock") == 0)
-		pr_info("airani: CPUSet guard hooked to Raco Global Sniper\n");
+		pr_info("iofi: CPUSet guard hooked to Raco Global Sniper\n");
 	else
-		pr_warn("airani: Raco hook failed, continuing without it\n");
+		pr_warn("iofi: Raco hook failed, continuing without it\n");
 
 	airani_thread = kthread_run(airani_worker, NULL, "airani_cpuset");
 	if (IS_ERR(airani_thread)) {
-		pr_err("airani: failed to start thread: %ld\n",
+		pr_err("iofi: failed to start thread: %ld\n",
 		       PTR_ERR(airani_thread));
 		raco_unregister_rc_override(airani_execute_cpuset_override);
 		return PTR_ERR(airani_thread);
 	}
 
-	pr_info("airani: active\n");
+	pr_info("iofi: active\n");
 	return 0;
 }
 
@@ -141,7 +141,7 @@ static void __exit airani_cpuset_exit(void)
 
 	raco_unregister_rc_override(airani_execute_cpuset_override);
 
-	pr_info("airani: unloaded\n");
+	pr_info("iofi: unloaded\n");
 }
 
 module_init(airani_cpuset_init);
