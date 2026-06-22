@@ -76,4 +76,12 @@ config AYUNDA_RISU_SAFEPROP
     Google integrity, this only help reduce detection of banking apps 
     on your devices
 
+config AMBATUBANK
+  tristate "Stop Fcking Detect My Root Devices!"
+  depends on KSU_SUSFS 
+  help
+    This has to be done because banking app detects root. Fk them, I just
+    want to root my device because I want to game with higher perfromance
+    not hacking to your bank accounts! I ain't a criminal to do that!
+
 endmenu
