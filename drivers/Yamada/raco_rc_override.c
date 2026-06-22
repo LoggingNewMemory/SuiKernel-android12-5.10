@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /*
  * drivers/misc/raco_rc_override.c
  * Raco Override — Universal .rc Override API
@@ -151,6 +151,6 @@ static int __init raco_override_init(void)
 }
 late_initcall(raco_override_init);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Raco Universal RC Override");

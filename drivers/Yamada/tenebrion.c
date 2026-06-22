@@ -1,5 +1,5 @@
 // tenebrion.c
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 // Tenebrion — Screen state based CPU frequency throttler + cpuset limiter
 // Author: Kanagawa Yamada
 
@@ -435,6 +435,6 @@ static void __exit tenebrion_exit(void)
 module_init(tenebrion_init);
 module_exit(tenebrion_exit);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Tenebrion: Screen state based CPU frequency throttler + cpuset limiter");

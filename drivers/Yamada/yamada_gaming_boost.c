@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 // Yamada Gaming Boost — Schedutil Vendor Hook Edition
 // Author: Kanagawa Yamada
 
@@ -113,6 +113,6 @@ static void __exit yamada_gaming_boost_exit(void) {
 module_init(yamada_gaming_boost_init);
 module_exit(yamada_gaming_boost_exit);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Yamada Gaming Boost — Schedutil Vendor Hook Edition");

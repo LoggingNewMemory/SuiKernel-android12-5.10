@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /*
  * drivers/misc/schedutil_enforcer.c
  * Schedutil Enforcer, enforce schedutil as default CPU GOV because vendor init.rc overrides it
@@ -50,5 +50,5 @@ static int __init schedutil_enforcer_init(void)
 }
 late_initcall(schedutil_enforcer_init);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_DESCRIPTION("Enforce schedutil as default CPU GOV because vendor init.rc overrides it");

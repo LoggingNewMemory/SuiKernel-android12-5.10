@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /*
  * drivers/misc/Yamada/yamada_dev_identification.c
  * SuiKernel Developer Identification
@@ -19,6 +19,6 @@ static int __init yamada_dev_ident_init(void)
 
 module_init(yamada_dev_ident_init);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("SuiKernel Developer Identification");

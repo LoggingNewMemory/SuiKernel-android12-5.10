@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /*
  * ochinai_inaho_audio.c
  * Ochinai Inaho Audio — SCHED_FIFO boost + PM QoS + Raco CPUSet API
@@ -291,6 +291,6 @@ static void __exit inaho_audio_enhance_exit(void)
 module_init(inaho_audio_enhance_init);
 module_exit(inaho_audio_enhance_exit);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Ochinai Inaho Audio — Raco API + Infinite Cores Support");

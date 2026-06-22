@@ -1,5 +1,5 @@
 // sandevistan_boot.c
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 // Sandevistan Boot — min=max lock for 30s, GKI 2.0 safe (PM QoS Method)
 // Author: Kanagawa Yamada
 
@@ -150,6 +150,6 @@ static void __exit sandevistan_boot_exit(void)
 module_init(sandevistan_boot_init);
 module_exit(sandevistan_boot_exit);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
 MODULE_DESCRIPTION("Sandevistan Boot — min=max freq lock during boot, GKI 2.0 safe (PM QoS Method)");
