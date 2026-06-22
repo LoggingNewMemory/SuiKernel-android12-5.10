@@ -25,7 +25,6 @@
  * scheduler already won't run heavy foreground work while the
  * screen is off, and touching those sets causes jank on wake.
  */
-#define CPUSET_BG_PATH      "/dev/cpuset/background/cpus"
 #define CPUSET_SYSBG_PATH   "/dev/cpuset/system-background/cpus"
 
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
@@ -165,16 +164,12 @@ static int tenebrion_get_screen_state(void)
  */
 #define CPUSET_SCREEN_OFF   "0\n"
 
-static char saved_bg_cpus[32] = "";
 static char saved_sysbg_cpus[32] = "";
 
 static void tenebrion_cpuset_restrict(void)
 {
     /* Save current mask before overriding */
-    tenebrion_read_file(CPUSET_BG_PATH, saved_bg_cpus, sizeof(saved_bg_cpus));
     tenebrion_read_file(CPUSET_SYSBG_PATH, saved_sysbg_cpus, sizeof(saved_sysbg_cpus));
-    if (tenebrion_write_file(CPUSET_BG_PATH, CPUSET_SCREEN_OFF) == 0)
-        pr_info("tenebrion: background cpuset → 0\n");
 
     if (tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF) == 0)
         pr_info("tenebrion: system-background cpuset → 0\n");
@@ -182,7 +177,6 @@ static void tenebrion_cpuset_restrict(void)
 
 static void tenebrion_cpuset_restore(void)
 {
-    char bg_buf[32];
     char sysbg_buf[32];
     char fallback_mask[32];
     int total_cores = num_possible_cpus();
@@ -191,13 +185,8 @@ static void tenebrion_cpuset_restore(void)
     snprintf(fallback_mask, sizeof(fallback_mask), "0-%d", total_cores - 1);
 
     /* tenebrion_read_file stripped the newline, so we must add it back */
-    snprintf(bg_buf, sizeof(bg_buf), "%s\n", 
-             saved_bg_cpus[0] ? saved_bg_cpus : fallback_mask);
     snprintf(sysbg_buf, sizeof(sysbg_buf), "%s\n", 
              saved_sysbg_cpus[0] ? saved_sysbg_cpus : fallback_mask);
-
-    if (tenebrion_write_file(CPUSET_BG_PATH, bg_buf) == 0)
-        pr_info("tenebrion: background cpuset restored → %s", bg_buf);
 
     if (tenebrion_write_file(CPUSET_SYSBG_PATH, sysbg_buf) == 0)
         pr_info("tenebrion: system-background cpuset restored → %s", sysbg_buf);
