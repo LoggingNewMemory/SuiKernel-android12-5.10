@@ -6,7 +6,6 @@ config OCHINAI_INAHO_AUDIO
     help
       Boosts audio threads to SCHED_FIFO priority, locks CPU latency
       via PM QoS, and expands CPUSet for audio processes to include
-      all cores. Author: Kanagawa Yamada. Say Y or M.
 
 config SPARXIE_SWAP_TUNER
 	tristate "Tune the swappiness value"
@@ -19,13 +18,15 @@ config RACO_RC_OVERRIDE
     default y
     help 
 	  To counter the sysfs write by rogue vendor init.rc scripts during boot.
+    Please see include/linux/raco_override.h
 
 config PAVOLIA_REINE_RESETPROP
 	tristate "Pavolia Reine API resetprop tool"
 	depends on KSU
 	default y
 	help
-	  Please see the required SELinux for this (See selinux.sh for more details)
+	  Please see the required Patches for this (See Bulder/PavoliaReinePatch.sh)
+    And please see include/linux/pavolia_reine_resetprop.h
 
 config SANDEVISTAN_BOOT
     tristate "Sandevistan Boot — temporary performance governor boost"
@@ -40,7 +41,6 @@ config YAMADA_GAMING_BOOST
     help
       Boosts CPU to max frequency and sets schedutil rate_limit_us
       to 0 on touch/key input events. Reverts after boost window.
-      Author: Kanagawa Yamada. Say Y or M.
 
 config YAMADA_TENEBRION
     tristate "Tenebrion — CPU freq drop on screen off"
@@ -48,7 +48,6 @@ config YAMADA_TENEBRION
     help
       Drops all CPU frequencies to minimum on system suspend,
       restores full range on resume.
-      Author: Kanagawa Yamada. Say Y or M.
 
 config SCHEDUTIL_ENFORCER
 	tristate "Enforce Schedutil as Default Governor"
@@ -84,11 +83,19 @@ config AIRANI_IOFIFTEEN_CPUSET
     just make this. This also helpful if PowerHAL try to change it -_-
 
 config ANYA_MELFISSA_THERMAL
-    tristate "Anya Disable Thermal — kernel-side thermal zone disabler"
-    depends on CPU_FREQ
-    help
-      Disables all thermal zones at boot by writing 'disabled'
-      to each thermal zone's mode sysfs node.
-      Author: Kanagawa Yamada. Say Y or M.
+  tristate "Anya Disable Thermal — kernel-side thermal zone disabler"
+  depends on CPU_FREQ
+  help
+    Disables all thermal zones at boot by writing 'disabled'
+    to each thermal zone's mode sysfs node.
+
+config MOONA_HOSHINOVA_ZRAM
+  tristate "ZRAM Tweaks and Override vendor init rc"
+  depends on RACO_RC_OVERRIDE
+  help
+    Some OEMs are just don't give a fk about ZRAM things and some puts
+    Unoptimized Value and Configurations on the devices without knowing
+    The actual better performance and memory. This however try to be as
+    Universal as possible and may give a better memory and performance
 
 endmenu
