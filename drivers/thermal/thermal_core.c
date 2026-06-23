@@ -456,7 +456,7 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
 static void update_temperature(struct thermal_zone_device *tz)
 {
 	int temp, ret;
-#ifdef CONFIG_YAMADA_ANYA_THERMAL
+#ifdef CONFIG_ANYA_MELFISSA_THERMAL
 	// Anya Thermal Definition
 	temp = 30000;
 	ret = 0;

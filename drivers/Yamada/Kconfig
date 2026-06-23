@@ -83,4 +83,12 @@ config AIRANI_IOFIFTEEN_CPUSET
     Some devices not set max CPU cores to the max, to fix this. Let's
     just make this. This also helpful if PowerHAL try to change it -_-
 
+config ANYA_MELFISSA_THERMAL
+    tristate "Anya Disable Thermal — kernel-side thermal zone disabler"
+    depends on CPU_FREQ
+    help
+      Disables all thermal zones at boot by writing 'disabled'
+      to each thermal zone's mode sysfs node.
+      Author: Kanagawa Yamada. Say Y or M.
+
 endmenu
