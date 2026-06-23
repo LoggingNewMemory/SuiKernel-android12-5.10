@@ -1018,7 +1018,16 @@ static ssize_t comp_algorithm_store(struct device *dev,
 	char compressor[ARRAY_SIZE(zram->compressor)];
 	size_t sz;
 
+#ifdef CONFIG_MOONA_HOSHINOVA_ZRAM
+	if (!strnstr(buf, "lz4", len)) {
+		pr_info("Moona Hoshinova ZRAM: forcing lz4 instead\n");
+		strlcpy(compressor, "lz4", sizeof(compressor));
+	} else {
+		strlcpy(compressor, buf, sizeof(compressor));
+	}
+#else
 	strlcpy(compressor, buf, sizeof(compressor));
+#endif
 	/* ignore trailing newline */
 	sz = strlen(compressor);
 	if (sz > 0 && compressor[sz - 1] == '\n')

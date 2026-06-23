@@ -1,12 +1,11 @@
 menu "Yamada Custom Android Drivers"
 
 config OCHINAI_INAHO_AUDIO
-    tristate "Ochinai Inaho Audio — SCHED_FIFO + PM QoS + CPUSet tuning"
-    depends on CPU_FREQ && SCHED_DEBUG
-    help
-      Boosts audio threads to SCHED_FIFO priority, locks CPU latency
-      via PM QoS, and expands CPUSet for audio processes to include
-      all cores. Author: Kanagawa Yamada. Say Y or M.
+	tristate "Ochinai Inaho Audio — SCHED_FIFO + PM QoS + CPUSet tuning"
+	depends on CPU_FREQ && SCHED_DEBUG
+	help
+	  Boosts audio threads to SCHED_FIFO priority, locks CPU latency
+	  via PM QoS, and expands CPUSet for audio processes to include
 
 config SPARXIE_SWAP_TUNER
 	tristate "Tune the swappiness value"
@@ -15,72 +14,88 @@ config SPARXIE_SWAP_TUNER
 	  using cat /proc/sys/vm/swappiness
 
 config RACO_RC_OVERRIDE
-    bool "Raco Override Universal .rc Override API"
-    default y
-    help 
+	bool "Raco Override Universal .rc Override API"
+	default y
+	help 
 	  To counter the sysfs write by rogue vendor init.rc scripts during boot.
+	  Please see include/linux/raco_override.h
 
 config PAVOLIA_REINE_RESETPROP
 	tristate "Pavolia Reine API resetprop tool"
 	depends on KSU
 	default y
 	help
-	  Please see the required SELinux for this (See selinux.sh for more details)
+	  Please see the required Patches for this (See Bulder/PavoliaReinePatch.sh)
+	  And please see include/linux/pavolia_reine_resetprop.h
 
 config SANDEVISTAN_BOOT
-    tristate "Sandevistan Boot — temporary performance governor boost"
-    depends on CPU_FREQ && CPU_FREQ_GOV_PERFORMANCE && CPU_FREQ_GOV_SCHEDUTIL
-    help
-      Sets the CPUfreq governor to 'performance' during boot for
-      BOOST_DELAY_SEC seconds, then reverts to 'schedutil'.
+	tristate "Sandevistan Boot — temporary performance governor boost"
+	depends on CPU_FREQ && CPU_FREQ_GOV_PERFORMANCE && CPU_FREQ_GOV_SCHEDUTIL
+	help
+	  Sets the CPUfreq governor to 'performance' during boot for
+	  BOOST_DELAY_SEC seconds, then reverts to 'schedutil'.
 
 config YAMADA_GAMING_BOOST
-    tristate "Yamada Gaming Boost — CPU input boost + schedutil tuning"
-    depends on CPU_FREQ && CPU_FREQ_GOV_SCHEDUTIL && INPUT
-    help
-      Boosts CPU to max frequency and sets schedutil rate_limit_us
-      to 0 on touch/key input events. Reverts after boost window.
-      Author: Kanagawa Yamada. Say Y or M.
+	tristate "Yamada Gaming Boost — CPU input boost + schedutil tuning"
+	depends on CPU_FREQ && CPU_FREQ_GOV_SCHEDUTIL && INPUT
+	help
+	  Boosts CPU to max frequency and sets schedutil rate_limit_us
+	  to 0 on touch/key input events. Reverts after boost window.
 
 config YAMADA_TENEBRION
-    tristate "Tenebrion — CPU freq drop on screen off"
-    depends on CPU_FREQ && SUSPEND
-    help
-      Drops all CPU frequencies to minimum on system suspend,
-      restores full range on resume.
-      Author: Kanagawa Yamada. Say Y or M.
+	tristate "Tenebrion — CPU freq drop on screen off"
+	depends on CPU_FREQ && SUSPEND
+	help
+	  Drops all CPU frequencies to minimum on system suspend,
+	  restores full range on resume.
 
 config SCHEDUTIL_ENFORCER
 	tristate "Enforce Schedutil as Default Governor"
 	depends on CPU_FREQ_DEFAULT_GOV_SCHEDUTIL && RACO_RC_OVERRIDE
 	help
-    This have to be done because some init on vendor sets the Governor
-    to sugov_ext (Which actually kinda same with schedutil). But because
-    my eye I don't want to see it. Feel free to use this as reference if
-    you want to change the governor with your own choice. Say Y or N
+	  This have to be done because some init on vendor sets the Governor
+	  to sugov_ext (Which actually kinda same with schedutil). But because
+	  my eye I don't want to see it. Feel free to use this as reference if
+	  you want to change the governor with your own choice. Say Y or N
 
 config YAMADA_DEV_IDENTIFICATION
-  tristate "Identification of this kernel developer IS"
-  depends on PAVOLIA_REINE_RESETPROP
-  help
-    This is actually to test PAVOLIA_REINE_SETPROP but eh, it would be a
-    good Identification that this kernel is make by me anyway. This will
-    be also an example usage of PAVOLIA_REINE_SETPROP API
+	tristate "Identification of this kernel developer IS"
+	depends on PAVOLIA_REINE_RESETPROP
+	help
+	  This is actually to test PAVOLIA_REINE_SETPROP but eh, it would be a
+	  good Identification that this kernel is make by me anyway. This will
+	  be also an example usage of PAVOLIA_REINE_SETPROP API
 
 config AYUNDA_RISU_SAFEPROP
-  tristate "Spoof some props for reduced root detection"
-  depends on PAVOLIA_REINE_RESETPROP
-  help
-    Set some props using resetprop in order to fix some detection. This
-    However not magically gives your device locked state, spoof basic
-    Google integrity, this only help reduce detection of banking apps 
-    on your devices
+	tristate "Spoof some props for reduced root detection"
+	depends on PAVOLIA_REINE_RESETPROP
+	help
+	  Set some props using resetprop in order to fix some detection. This
+	  However not magically gives your device locked state, spoof basic
+	  Google integrity, this only help reduce detection of banking apps 
+	  on your devices
 
 config AIRANI_IOFIFTEEN_CPUSET
-  tristate "Maximum CPUSet tweaks"
-  depends on RACO_RC_OVERRIDE
-  help
-    Some devices not set max CPU cores to the max, to fix this. Let's
-    just make this. This also helpful if PowerHAL try to change it -_-
+	tristate "Maximum CPUSet tweaks"
+	depends on RACO_RC_OVERRIDE
+	help
+	  Some devices not set max CPU cores to the max, to fix this. Let's
+	  just make this. This also helpful if PowerHAL try to change it -_-
+
+config ANYA_MELFISSA_THERMAL
+	tristate "Anya Disable Thermal — kernel-side thermal zone disabler"
+	depends on CPU_FREQ
+	help
+	  Disables all thermal zones at boot by writing 'disabled'
+	  to each thermal zone's mode sysfs node.
+
+config MOONA_HOSHINOVA_ZRAM
+	tristate "ZRAM Tweaks and Override vendor init rc"
+	depends on RACO_RC_OVERRIDE
+	help
+	  Some OEMs are just don't give a fk about ZRAM things and some puts
+	  Unoptimized Value and Configurations on the devices without knowing
+	  The actual better performance and memory. This however try to be as
+	  Universal as possible and may give a better memory and performance
 
 endmenu

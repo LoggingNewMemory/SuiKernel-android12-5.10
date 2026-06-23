@@ -62,6 +62,3 @@ obj-$(CONFIG_UNIPHIER_THERMAL)	+= uniphier_thermal.o
 obj-$(CONFIG_AMLOGIC_THERMAL)     += amlogic_thermal.o
 obj-$(CONFIG_SPRD_THERMAL)	+= sprd_thermal.o
 obj-$(CONFIG_KHADAS_MCU_FAN_THERMAL)	+= khadas_mcu_fan.o
-
-# Anya Disable Thermal (Yamada)
-obj-$(CONFIG_YAMADA_ANYA_THERMAL) += anya_disable_thermal.o
