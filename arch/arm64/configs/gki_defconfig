@@ -754,6 +754,11 @@ CONFIG_SCHEDUTIL_ENFORCER=y
 CONFIG_YAMADA_DEV_IDENTIFICATION=y
 
 ###########################
+# Yamada Debug Tool 
+###########################
+CONFIG_KANAGAWA_PERMISSIVE=n
+
+###########################
 # Hololive Indonesia Series
 ###########################
 
