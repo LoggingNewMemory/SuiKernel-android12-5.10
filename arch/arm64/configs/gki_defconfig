@@ -773,6 +773,9 @@ CONFIG_ANYA_MELFISSA_THERMAL=y
 CONFIG_PAVOLIA_REINE_RESETPROP=y
 CONFIG_KUREIJI_OLLIE_AFFINITY=y
 
+# Gen 3
+CONFIG_KOBO_FAST_CHARGE=y
+
 ###########################
 # APIs
 ###########################
