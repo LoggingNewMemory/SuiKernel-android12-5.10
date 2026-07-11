@@ -97,11 +97,20 @@ config MOONA_HOSHINOVA_ZRAM
 	  Unoptimized Value and Configurations on the devices without knowing
 	  The actual better performance and memory. This however try to be as
 	  Universal as possible and may give a better memory and performance
+
 config KANAGAWA_PERMISSIVE
 	bool "Kanagawa Permissive"
 	default n
 	help
 	  Make ROM permissive via Kernel side. This will also append -PERMISSIVE
 	  to the kernel uname.
+
+config KUREIJI_OLLIE_AFFINITY
+	tristate "Modifies kswapd to highest CPU cores"
+	depends on RACO_RC_OVERRIDE
+	help
+	  Modifies kswapd Affinity to just highest CPU Cores, AKA: Big or Prime
+	  Depends on what policyx are. When OEMs just do nonsense thing that may
+	  not suitable. This kernel will save your performance for gaming
 
 endmenu
