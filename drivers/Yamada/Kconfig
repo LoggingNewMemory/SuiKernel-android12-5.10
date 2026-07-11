@@ -113,4 +113,11 @@ config KUREIJI_OLLIE_AFFINITY
 	  Depends on what policyx are. When OEMs just do nonsense thing that may
 	  not suitable. This kernel will save your performance for gaming
 
+config KOBO_FAST_CHARGE
+	tristate "Disables Charger Limits"
+	help
+	  See drivers/power/supply/power_supply_sysfs.c it disables generic path
+	  of battery. This actually dangerous but meh, This kernel built for gamers
+	  Their phone explode? I don't give a hell
+
 endmenu

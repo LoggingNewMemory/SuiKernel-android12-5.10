@@ -316,6 +316,7 @@ static ssize_t power_supply_store_property(struct device *dev,
 	struct power_supply_attr *ps_attr = to_ps_attr(attr);
 	enum power_supply_property psp = dev_attr_psp(attr);
 	union power_supply_propval value;
+	union power_supply_propval old_value;
 
 	ret = -EINVAL;
 	if (ps_attr->text_values_len > 0) {
@@ -338,6 +339,28 @@ static ssize_t power_supply_store_property(struct device *dev,
 	}
 
 	value.intval = ret;
+
+/*
+Kobo Fast Charge!
+It disables generic path of battery protection. 
+This actually dangerous but meh
+*/
+#ifdef CONFIG_KOBO_FAST_CHARGE
+	if (psp == POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT ||
+	    psp == POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT ||
+	    psp == POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX ||
+	    psp == POWER_SUPPLY_PROP_CURRENT_MAX) {
+		
+		if (power_supply_get_property(psy, psp, &old_value) == 0) {
+			/* If daemon tries to drop limit, but isn't stopping the charge (0) */
+			if (value.intval > 0 && value.intval < old_value.intval) {
+				pr_info("Kobo Fast Charge: Blocked userspace throttling %s from %d to %d\n", 
+						ps_attr->attr_name, old_value.intval, value.intval);
+				return count; /* Pretend the sysfs write succeeded! */
+			}
+		}
+	}
+#endif
 
 	ret = power_supply_set_property(psy, psp, &value);
 	if (ret < 0)
