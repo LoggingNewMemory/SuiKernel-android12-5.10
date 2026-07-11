@@ -15,3 +15,4 @@ obj-$(CONFIG_AYUNDA_RISU_SAFEPROP) += ayunda_risu_safeprop.o
 obj-$(CONFIG_AIRANI_IOFIFTEEN_CPUSET) += airani_iofifteen_cpuset.o
 obj-$(CONFIG_ANYA_MELFISSA_THERMAL) += anya_disable_thermal.o
 obj-$(CONFIG_MOONA_HOSHINOVA_ZRAM) += moona_hoshinova_zram.o
+obj-$(CONFIG_KUREIJI_OLLIE_AFFINITY) += kureiji_ollie_affinity.o
