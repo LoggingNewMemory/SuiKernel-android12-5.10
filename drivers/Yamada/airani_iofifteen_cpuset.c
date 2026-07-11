@@ -26,6 +26,7 @@ static bool airani_enabled = true;
 module_param(airani_enabled, bool, 0644);
 MODULE_PARM_DESC(airani_enabled, "Enable Airani Iofifteen CPUSet Tweaks (default: true)");
 
+static struct task_struct *airani_thread;
 static char all_cores_str[64];
 static char no_prime_cores_str[64];
 static char little_cores_str[64];
