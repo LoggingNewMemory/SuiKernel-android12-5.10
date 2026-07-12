@@ -28,10 +28,15 @@ extern void (*yamada_boost_hook)(void);
 
 static void do_boost_off(struct work_struct *work) {
 	unsigned long flags;
+	int cpu;
 
 	spin_lock_irqsave(&boost_lock, flags);
 	WRITE_ONCE(yamada_is_boosted, false);
 	spin_unlock_irqrestore(&boost_lock, flags);
+
+	for_each_online_cpu(cpu) {
+		cpufreq_update_policy(cpu);
+	}
 
 	pr_info("yamada_gaming_boost: touch boost OFF\n");
 }
