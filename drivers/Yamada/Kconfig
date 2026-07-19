@@ -120,9 +120,9 @@ config KOBO_FAST_CHARGE
 	  of battery. This actually dangerous but meh, This kernel built for gamers
 	  Their phone explode? I don't give a hell
 
-config VESTIA_ZETA_SPOOF
-	tristate "Spoof: some property to avoid detections"
+config YAMADA_IS_ANGRY
+	tristate "Blocklist devices from booting using SuiKernel"
 	help
-	  Spoofed verifiedbootstate, device_state, flash.locked, veritymode
+	  If you hate some devices, you can list the device. Ex: X6882
 
 endmenu
