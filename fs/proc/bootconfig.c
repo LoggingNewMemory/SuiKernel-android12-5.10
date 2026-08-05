@@ -14,6 +14,7 @@
 static char *saved_boot_config;
 
 #ifdef CONFIG_VESTIA_ZETA_SPOOF
+#include <linux/sched.h>
 static void safe_replace(char *str, const char *old_str, const char *new_str)
 {
 	char *pos;
@@ -31,7 +32,14 @@ static int boot_config_proc_show(struct seq_file *m, void *v)
 {
 	if (saved_boot_config) {
 #ifdef CONFIG_VESTIA_ZETA_SPOOF
-		char *b = kmalloc(strlen(saved_boot_config) + 256, GFP_KERNEL);
+		char *b;
+		
+		if (current->pid == 1 || strstr(current->comm, "init") || strstr(current->comm, "recovery") || strstr(current->comm, "ueventd") || strstr(current->comm, "vold")) {
+			seq_puts(m, saved_boot_config);
+			return 0;
+		}
+
+		b = kmalloc(strlen(saved_boot_config) + 256, GFP_KERNEL);
 		if (!b) {
 			seq_puts(m, saved_boot_config);
 			return 0;

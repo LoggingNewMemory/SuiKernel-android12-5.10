@@ -7,6 +7,7 @@
 #include <linux/string.h>
 
 #ifdef CONFIG_VESTIA_ZETA_SPOOF
+#include <linux/sched.h>
 static void safe_replace(char *str, const char *old_str, const char *new_str)
 {
 	char *pos;
@@ -23,7 +24,15 @@ static void safe_replace(char *str, const char *old_str, const char *new_str)
 static int cmdline_proc_show(struct seq_file *m, void *v)
 {
 #ifdef CONFIG_VESTIA_ZETA_SPOOF
-	char *c = kmalloc(strlen(saved_command_line) + 256, GFP_KERNEL);
+	char *c;
+
+	if (current->pid == 1 || strstr(current->comm, "init") || strstr(current->comm, "recovery") || strstr(current->comm, "ueventd") || strstr(current->comm, "vold")) {
+		seq_puts(m, saved_command_line);
+		seq_putc(m, '\n');
+		return 0;
+	}
+
+	c = kmalloc(strlen(saved_command_line) + 256, GFP_KERNEL);
 	if (!c) {
 		seq_puts(m, saved_command_line);
 		seq_putc(m, '\n');
