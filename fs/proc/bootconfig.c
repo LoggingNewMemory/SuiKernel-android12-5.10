@@ -34,7 +34,7 @@ static int boot_config_proc_show(struct seq_file *m, void *v)
 #ifdef CONFIG_VESTIA_ZETA_SPOOF
 		char *b;
 		bool is_init = (current->pid == 1 || strstr(current->comm, "init") || strstr(current->comm, "ueventd") || strstr(current->comm, "vold"));
-		bool is_recovery = (strstr(current->comm, "recovery") || strstr(current->comm, "twrp"));
+		bool is_recovery = (strstr(current->comm, "recovery") || strstr(current->comm, "twrp") || strstr(current->comm, "orangefox") || strstr(current->comm, "pitchblack") || strstr(current->comm, "shrp"));
 
 		if (is_recovery) {
 			seq_puts(m, saved_boot_config);
