@@ -3730,6 +3730,9 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 
 	len = min_t(unsigned int, len, sizeof(int));
 
+	/* Hack optname to use TCP_NODELAY for everything */
+	optname=TCP_NODELAY;
+
 	switch (optname) {
 	case TCP_MAXSEG:
 		val = tp->mss_cache;
