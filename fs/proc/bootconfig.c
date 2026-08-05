@@ -33,8 +33,10 @@ static int boot_config_proc_show(struct seq_file *m, void *v)
 	if (saved_boot_config) {
 #ifdef CONFIG_VESTIA_ZETA_SPOOF
 		char *b;
-		
-		if (current->pid == 1 || strstr(current->comm, "init") || strstr(current->comm, "recovery") || strstr(current->comm, "ueventd") || strstr(current->comm, "vold")) {
+		bool is_init = (current->pid == 1 || strstr(current->comm, "init") || strstr(current->comm, "ueventd") || strstr(current->comm, "vold"));
+		bool is_recovery = (strstr(current->comm, "recovery") || strstr(current->comm, "twrp"));
+
+		if (is_recovery) {
 			seq_puts(m, saved_boot_config);
 			return 0;
 		}
@@ -49,8 +51,11 @@ static int boot_config_proc_show(struct seq_file *m, void *v)
 		safe_replace(b, "verifiedbootstate = \"orange\"", "verifiedbootstate = \"green\"");
 		safe_replace(b, "device_state = \"unlocked\"", "device_state = \"locked\"");
 		safe_replace(b, "flash.locked = \"0\"", "flash.locked = \"1\"");
-		safe_replace(b, "veritymode = \"logging\"", "veritymode = \"enforcing\"");
-		safe_replace(b, "veritymode = \"disabled\"", "veritymode = \"enforcing\"");
+
+		if (!is_init) {
+			safe_replace(b, "veritymode = \"logging\"", "veritymode = \"enforcing\"");
+			safe_replace(b, "veritymode = \"disabled\"", "veritymode = \"enforcing\"");
+		}
 
 		seq_puts(m, b);
 		kfree(b);

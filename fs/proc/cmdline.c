@@ -25,8 +25,10 @@ static int cmdline_proc_show(struct seq_file *m, void *v)
 {
 #ifdef CONFIG_VESTIA_ZETA_SPOOF
 	char *c;
+	bool is_init = (current->pid == 1 || strstr(current->comm, "init") || strstr(current->comm, "ueventd") || strstr(current->comm, "vold"));
+	bool is_recovery = (strstr(current->comm, "recovery") || strstr(current->comm, "twrp"));
 
-	if (current->pid == 1 || strstr(current->comm, "init") || strstr(current->comm, "recovery") || strstr(current->comm, "ueventd") || strstr(current->comm, "vold")) {
+	if (is_recovery) {
 		seq_puts(m, saved_command_line);
 		seq_putc(m, '\n');
 		return 0;
@@ -42,9 +44,12 @@ static int cmdline_proc_show(struct seq_file *m, void *v)
 
 	safe_replace(c, "verifiedbootstate=orange", "verifiedbootstate=green");
 	safe_replace(c, "verifiedbootstate=red", "verifiedbootstate=green");
-	safe_replace(c, "veritymode=logging", "veritymode=enforcing");
-	safe_replace(c, "veritymode=disabled", "veritymode=enforcing");
 	safe_replace(c, "flash.locked=0", "flash.locked=1");
+
+	if (!is_init) {
+		safe_replace(c, "veritymode=logging", "veritymode=enforcing");
+		safe_replace(c, "veritymode=disabled", "veritymode=enforcing");
+	}
 
 	seq_puts(m, c);
 	seq_putc(m, '\n');
