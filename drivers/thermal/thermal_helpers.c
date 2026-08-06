@@ -87,13 +87,7 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 	int crit_temp = INT_MAX;
 	enum thermal_trip_type type;
 
-#ifdef CONFIG_ANYA_MELFISSA_THERMAL
-	// Modification of Anya Thermal. Spoof to 30 Celcius
-	if (temp) {
-		*temp = 30000;
-		return 0;
-	}
-#endif
+
 
 	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
 		goto exit;
@@ -120,6 +114,16 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 		if (!ret && *temp < crit_temp)
 			*temp = tz->emul_temperature;
 	}
+
+#ifdef CONFIG_ANYA_MELFISSA_THERMAL
+	// Modification of Anya Thermal. Scale down high temperatures
+	// so it stays cool but still dynamic to avoid HAL crashes.
+	if (!ret && temp && *temp > 30000) {
+		*temp = 30000 + ((*temp - 30000) / 8);
+		if (*temp > 40000)
+			*temp = 40000;
+	}
+#endif
 
 	mutex_unlock(&tz->lock);
 exit:

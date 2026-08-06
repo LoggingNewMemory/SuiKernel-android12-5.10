@@ -13,42 +13,10 @@
 
 static char *saved_boot_config;
 
-#ifdef CONFIG_VESTIA_ZETA_SPOOF
-static void safe_replace(char *str, const char *old_str, const char *new_str)
-{
-	char *pos;
-	while ((pos = strstr(str, old_str))) {
-		size_t old_len = strlen(old_str);
-		size_t new_len = strlen(new_str);
-		size_t tail_len = strlen(pos + old_len);
-		memmove(pos + new_len, pos + old_len, tail_len + 1);
-		memcpy(pos, new_str, new_len);
-	}
-}
-#endif
-
 static int boot_config_proc_show(struct seq_file *m, void *v)
 {
 	if (saved_boot_config) {
-#ifdef CONFIG_VESTIA_ZETA_SPOOF
-		char *b = kmalloc(strlen(saved_boot_config) + 256, GFP_KERNEL);
-		if (!b) {
-			seq_puts(m, saved_boot_config);
-			return 0;
-		}
-		strcpy(b, saved_boot_config);
-
-		safe_replace(b, "verifiedbootstate = \"orange\"", "verifiedbootstate = \"green\"");
-		safe_replace(b, "device_state = \"unlocked\"", "device_state = \"locked\"");
-		safe_replace(b, "flash.locked = \"0\"", "flash.locked = \"1\"");
-		safe_replace(b, "veritymode = \"logging\"", "veritymode = \"enforcing\"");
-		safe_replace(b, "veritymode = \"disabled\"", "veritymode = \"enforcing\"");
-
-		seq_puts(m, b);
-		kfree(b);
-#else
 		seq_puts(m, saved_boot_config);
-#endif
 	}
 	return 0;
 }
