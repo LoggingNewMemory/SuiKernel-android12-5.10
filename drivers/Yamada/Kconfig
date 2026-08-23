@@ -22,7 +22,7 @@ config RACO_RC_OVERRIDE
 
 config PAVOLIA_REINE_RESETPROP
 	tristate "Pavolia Reine API resetprop tool"
-	depends on KSU
+	depends on KSU || YAMADA_KSU_CORE
 	default y
 	help
 	  Please see the required Patches for this (See Bulder/PavoliaReinePatch.sh)
@@ -120,6 +120,13 @@ config KOBO_FAST_CHARGE
 	  of battery. This actually dangerous but meh, This kernel built for gamers
 	  Their phone explode? I don't give a hell
 
-
+config YAMADA_KSU_CORE
+	bool "Yamada Minimal KernelSU Core (Vanilla)"
+	default y
+	depends on !KSU
+	help
+	  This provides minimal native KernelSU-like features (like SELinux rule
+	  injection and init.rc property appending) for the Vanilla variant where
+	  the official KernelSU Next is not installed.
 
 endmenu
