@@ -6,6 +6,7 @@
 extern void yamada_ksu_init_selinux_hooks(void);
 extern void yamada_ksu_init_runtime_hooks(void);
 extern void yamada_ksu_exit_selinux_hooks(void);
+extern void yamada_ksu_exit_runtime_hooks(void);
 extern void yamada_ksu_init_stat_hooks(void);
 extern void yamada_ksu_exit_stat_hooks(void);
 

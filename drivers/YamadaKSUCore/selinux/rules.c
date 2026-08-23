@@ -27,6 +27,7 @@ struct {
     struct policydb *policy;
 } fake_selinux_state;
 #define selinux_state fake_selinux_state
+#undef rcu_assign_pointer
 #define rcu_assign_pointer(ptr, val) do { (ptr) = (val); } while (0)
 static struct policydb fake_pol;
 static struct policydb *pol = &fake_pol;
