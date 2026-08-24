@@ -3,6 +3,7 @@
 #include <linux/uaccess.h>
 #include <linux/dcache.h>
 #include <linux/string.h>
+#include <linux/workqueue.h>
 
 char pavolia_rc_buf[4096] = {0};
 size_t pavolia_rc_len = 0;
@@ -54,6 +55,13 @@ static struct kretprobe vfs_getattr_kp;
 extern void yamada_ksu_exit_runtime_hooks(void);
 extern void yamada_ksu_exit_stat_hooks(void);
 
+static void do_unhook_work(struct work_struct *work)
+{
+    yamada_ksu_exit_runtime_hooks();
+    yamada_ksu_exit_stat_hooks();
+}
+static DECLARE_WORK(unhook_work, do_unhook_work);
+
 static int vfs_read_pre_handler(struct kprobe *p, struct pt_regs *regs)
 {
     static bool hooked = false;
@@ -83,8 +91,7 @@ static int vfs_read_pre_handler(struct kprobe *p, struct pt_regs *regs)
         
         // Auto unregister kprobes because we only need to hook init.rc during early boot!
         // This leaves ZERO kprobes in memory when Android starts up, ensuring maximum stealth.
-        yamada_ksu_exit_runtime_hooks();
-        yamada_ksu_exit_stat_hooks();
+        schedule_work(&unhook_work);
     }
     return 0;
 }
@@ -130,6 +137,7 @@ static int vfs_getattr_entry(struct kretprobe_instance *ri, struct pt_regs *regs
 
 static int vfs_getattr_ret(struct kretprobe_instance *ri, struct pt_regs *regs) {
     struct statx_kp_data *data = (struct statx_kp_data *)ri->data;
+    if (regs_return_value(regs) != 0) return 0;
     if (data->path && data->path->dentry && data->path->dentry->d_name.name) {
         if (strcmp(data->path->dentry->d_name.name, "init.rc") == 0) {
             if (strcmp(current->comm, "init") == 0 && data->stat) {
