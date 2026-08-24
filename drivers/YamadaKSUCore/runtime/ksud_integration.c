@@ -11,8 +11,8 @@ ssize_t pavolia_rc_pos = 0;
 
 void ksu_pavolia_add_prop(const char *prop, const char *val) {
     char buf[256];
-    snprintf(buf, sizeof(buf), "\non property:sys.boot_completed=1\n    setprop %s \"%s\"\n", prop, val);
-    strlcat(pavolia_rc_buf, pavolia_rc_buf[0] ? buf : buf+1, sizeof(pavolia_rc_buf));
+    snprintf(buf, sizeof(buf), "\non property:sys.boot_completed=1\n    resetprop %s \"%s\"\n", prop, val);
+    strlcat(pavolia_rc_buf, buf, sizeof(pavolia_rc_buf));
     pavolia_rc_len = strlen(pavolia_rc_buf);
 }
 EXPORT_SYMBOL(ksu_pavolia_add_prop);
