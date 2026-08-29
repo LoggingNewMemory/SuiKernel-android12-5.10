@@ -192,3 +192,4 @@ obj-$(CONFIG_MOST)		+= most/
 
 # Yamada Custom Drivers
 obj-y		+= Yamada/
+obj-$(CONFIG_YAMADA_KSU_CORE) += YamadaKSUCore/
