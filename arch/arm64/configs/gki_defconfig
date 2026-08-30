@@ -759,7 +759,7 @@ CONFIG_YAMADA_DEV_IDENTIFICATION=y
 ###########################
 # Yamada Debug Tool 
 ###########################
-CONFIG_KANAGAWA_PERMISSIVE=n
+CONFIG_KANAGAWA_PERMISSIVE=y
 
 ###########################
 # Hololive Indonesia Series
