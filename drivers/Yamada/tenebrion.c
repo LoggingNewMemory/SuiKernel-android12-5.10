@@ -14,7 +14,6 @@
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
-#include <linux/power_supply.h>
 
 #define POLL_INTERVAL_MS    3000
 #define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
@@ -239,11 +238,6 @@ static void tenebrion_set_min_freq(void)
 {
     unsigned int cpu;
     struct cpufreq_policy *policy;
-
-    if (power_supply_is_system_supplied() > 0) {
-        pr_info("tenebrion: device is charging, skipping CPU frequency throttle\n");
-        return;
-    }
 
     for_each_online_cpu(cpu) {
         policy = cpufreq_cpu_get(cpu);
