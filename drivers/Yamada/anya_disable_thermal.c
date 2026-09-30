@@ -17,9 +17,7 @@
 
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
-static bool anya_thermal_enabled = true;
-module_param(anya_thermal_enabled, bool, 0644);
-MODULE_PARM_DESC(anya_thermal_enabled, "Enable Anya Disable Thermal (default: true)");
+bool anya_thermal_enabled = true;
 
 static struct task_struct *anya_thermal_thread;
 

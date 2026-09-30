@@ -22,9 +22,7 @@ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #define ENGAGE_DELAY_MS     20000
 #define CPUSET_SCAN_MS       5000
 
-static bool airani_enabled = true;
-module_param(airani_enabled, bool, 0644);
-MODULE_PARM_DESC(airani_enabled, "Enable Airani Iofifteen CPUSet Tweaks (default: true)");
+bool airani_enabled = true;
 
 static struct task_struct *airani_thread;
 static char all_cores_str[64];

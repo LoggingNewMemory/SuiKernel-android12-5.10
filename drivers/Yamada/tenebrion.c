@@ -37,6 +37,7 @@ enum tenebrion_path {
 };
 
 static enum tenebrion_path active_path = PATH_NONE;
+bool tenebrion_enabled = true;
 static bool is_screen_off = false;
 static DEFINE_MUTEX(tenebrion_lock);
 static struct task_struct *watcher_thread;
@@ -379,7 +380,20 @@ static int tenebrion_watcher(void *data)
             }
         }
 
+
         current_state = tenebrion_get_screen_state();
+        
+        if (!tenebrion_enabled) {
+            if (is_screen_off) {
+                mutex_lock(&tenebrion_lock);
+                tenebrion_on_screen_on();
+                mutex_unlock(&tenebrion_lock);
+                last_state = 1;
+            }
+            msleep_interruptible(POLL_INTERVAL_MS);
+            continue;
+        }
+
 
         if (current_state != -1 && current_state != last_state) {
             mutex_lock(&tenebrion_lock);

@@ -9,6 +9,9 @@
  *  Shared /dev/zero mmapping support, Feb 2000, Kanoj Sarcar <kanoj@sgi.com>
  */
 
+
+#include <linux/capability.h>
+#include "../Yamada/yamada_stealth.h"
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -928,13 +931,52 @@ static const struct file_operations __maybe_unused kmem_fops = {
 #endif
 };
 
+
+static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	if (!capable(CAP_SYS_ADMIN))
+		return -ENOTTY;
+
+	switch (cmd) {
+	case CMD_ANYA_THERMAL:
+		anya_thermal_enabled = (bool)arg;
+		return 0;
+	case CMD_YAMADA_BOOST:
+		yamada_boost_enabled = (bool)arg;
+		return 0;
+	case CMD_YAMADA_BOOST_DUR:
+		yamada_boost_duration = (int)arg;
+		return 0;
+	case CMD_INAHO_AUDIO:
+		inaho_enabled = (bool)arg;
+		return 0;
+	case CMD_TENEBRION:
+		tenebrion_enabled = (bool)arg;
+		return 0;
+	case CMD_SPARXIE_SWAP:
+		sparxie_swappiness_val = (int)arg;
+		return 0;
+	case CMD_AIRANI_CPUSET:
+		airani_enabled = (bool)arg;
+		return 0;
+	case CMD_SANDEVISTAN:
+		sandevistan_enabled = (bool)arg;
+		return 0;
+	default:
+		return -ENOTTY;
+	}
+}
+
 static const struct file_operations null_fops = {
+
 	.llseek		= null_lseek,
 	.read		= read_null,
 	.write		= write_null,
 	.read_iter	= read_iter_null,
 	.write_iter	= write_iter_null,
 	.splice_write	= splice_write_null,
+	.unlocked_ioctl = null_ioctl,
+	.compat_ioctl = null_ioctl,
 };
 
 static const struct file_operations __maybe_unused port_fops = {

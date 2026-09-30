@@ -12,7 +12,7 @@
 #include <linux/mm.h>
 #include <linux/raco_override.h>
 
-#define SPARXIE_SWAPPINESS 30
+int sparxie_swappiness_val = 30;
 
 extern int vm_swappiness;
 
@@ -22,15 +22,15 @@ extern int vm_swappiness;
  */
 static void apply_swappiness_cb(void)
 {
-	vm_swappiness = SPARXIE_SWAPPINESS;
-	pr_info("sparxie: vm_swappiness forcefully applied -> %d\n", SPARXIE_SWAPPINESS);
+	vm_swappiness = sparxie_swappiness_val;
+	pr_info("sparxie: vm_swappiness forcefully applied -> %d\n", sparxie_swappiness_val);
 }
 
 static int __init sparxie_swap_init(void)
 {
 	/* 1. Apply immediately at boot */
-	vm_swappiness = SPARXIE_SWAPPINESS;
-	pr_info("sparxie: vm_swappiness set to %d\n", SPARXIE_SWAPPINESS);
+	vm_swappiness = sparxie_swappiness_val;
+	pr_info("sparxie: vm_swappiness set to %d\n", sparxie_swappiness_val);
 
 	/* 2. Hand long-term defence to Raco Sniper via callback */
 	if (raco_register_rc_override(apply_swappiness_cb, "vm.swappiness") == 0) {

@@ -32,9 +32,7 @@
 /* Module parameter                                                     */
 /* ------------------------------------------------------------------ */
 
-static bool inaho_enabled = true;
-module_param(inaho_enabled, bool, 0644);
-MODULE_PARM_DESC(inaho_enabled, "Enable Ochinai Inaho Audio (default: true)");
+bool inaho_enabled = true;
 
 /* ------------------------------------------------------------------ */
 /* State                                                                */

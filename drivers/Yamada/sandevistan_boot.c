@@ -12,9 +12,7 @@
 #define BOOST_DELAY_MS   10000
 #define REVERT_DELAY_MS  10000
 
-static bool sandevistan_enabled = true;
-module_param(sandevistan_enabled, bool, 0644);
-MODULE_PARM_DESC(sandevistan_enabled, "Enable Sandevistan boot boost (default: true)");
+bool sandevistan_enabled = true;
 
 static struct delayed_work boost_work;
 static struct delayed_work revert_work;

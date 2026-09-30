@@ -12,11 +12,9 @@
 
 #define BOOST_DURATION_MS   100
 
-static bool yamada_boost_enabled = true;
-module_param(yamada_boost_enabled, bool, 0644);
+bool yamada_boost_enabled = true;
 
-static unsigned int boost_duration_ms = BOOST_DURATION_MS;
-module_param(boost_duration_ms, uint, 0644);
+int yamada_boost_duration = BOOST_DURATION_MS;
 
 extern bool yamada_is_boosted;
 static DEFINE_SPINLOCK(boost_lock);
@@ -55,7 +53,7 @@ static void kobo_trigger_boost(void) {
 	spin_unlock_irqrestore(&boost_lock, flags);
 
 	/* Refresh the delayed work timer on every touch event */
-	mod_delayed_work(system_wq, &boost_off_work, msecs_to_jiffies(boost_duration_ms));
+	mod_delayed_work(system_wq, &boost_off_work, msecs_to_jiffies(yamada_boost_duration));
 }
 
 static int __init yamada_gaming_boost_init(void) {
