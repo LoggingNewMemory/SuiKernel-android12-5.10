@@ -5,8 +5,8 @@
 
 /* Global variables for SuiKernel Manager Stealth IOCTL */
 extern bool anya_thermal_enabled;
-extern bool yamada_boost_enabled;
-extern int  yamada_boost_duration;
+extern bool yamada_touch_boost_enabled;
+extern int  yamada_touch_boost_duration;
 extern bool inaho_enabled;
 extern bool tenebrion_enabled;
 extern int  sparxie_swappiness_val;
@@ -15,8 +15,8 @@ extern bool sandevistan_enabled;
 
 /* Magic IOCTL Commands for /dev/null */
 #define CMD_ANYA_THERMAL 0x392C8989
-#define CMD_YAMADA_BOOST 0x4E1F48AE
-#define CMD_YAMADA_BOOST_DUR 0x2605423F
+#define CMD_YAMADA_TOUCH_BOOST 0x4E1F48AE
+#define CMD_YAMADA_TOUCH_BOOST_DUR 0x2605423F
 #define CMD_INAHO_AUDIO 0x1281817A
 #define CMD_TENEBRION 0x11EAF5CB
 #define CMD_SPARXIE_SWAP 0x1B3FB033

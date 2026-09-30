@@ -35,8 +35,8 @@ config SANDEVISTAN_BOOT
 	  Sets the CPUfreq governor to 'performance' during boot for
 	  BOOST_DELAY_SEC seconds, then reverts to 'schedutil'.
 
-config YAMADA_GAMING_BOOST
-	tristate "Yamada Gaming Boost — CPU input boost + schedutil tuning"
+config YAMADA_TOUCH_BOOST
+	tristate "Yamada Touch Boost — CPU input boost + schedutil tuning"
 	depends on CPU_FREQ && CPU_FREQ_GOV_SCHEDUTIL && INPUT
 	help
 	  Boosts CPU to max frequency and sets schedutil rate_limit_us
