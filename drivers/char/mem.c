@@ -934,9 +934,6 @@ static const struct file_operations __maybe_unused kmem_fops = {
 
 static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	if (!capable(CAP_SYS_ADMIN))
-		return -ENOTTY;
-
 	switch (cmd) {
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;
