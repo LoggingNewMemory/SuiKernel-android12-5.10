@@ -1,9 +1,9 @@
-#ifndef _YAMADA_STEALTH_H
-#define _YAMADA_STEALTH_H
+#ifndef _IOCTL_LIBRARY_H
+#define _IOCTL_LIBRARY_H
 
 #include <linux/types.h>
 
-/* Global variables for SuiKernel Manager Stealth IOCTL */
+/* Global variables for SuiKernel Manager IOCTL */
 extern bool anya_thermal_enabled;
 extern bool yamada_touch_boost_enabled;
 extern int  yamada_touch_boost_duration;
@@ -24,4 +24,4 @@ extern bool sandevistan_enabled;
 #define CMD_AIRANI_CPUSET 0x2FC6501B
 #define CMD_SANDEVISTAN 0x27B55B18
 
-#endif /* _YAMADA_STEALTH_H */
+#endif /* _IOCTL_LIBRARY_H */

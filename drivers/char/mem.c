@@ -11,7 +11,7 @@
 
 
 #include <linux/capability.h>
-#include "../Yamada/yamada_stealth.h"
+#include "../Yamada/IOCTL_Library.h"
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
