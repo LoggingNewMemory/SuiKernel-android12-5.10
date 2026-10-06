@@ -116,9 +116,10 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 	}
 
 #ifdef CONFIG_ANYA_MELFISSA_THERMAL
+	extern bool anya_thermal_enabled;
 	// Modification of Anya Thermal. Scale down high temperatures
 	// so it stays cool but still dynamic to avoid HAL crashes.
-	if (!ret && temp && *temp > 30000) {
+	if (!ret && temp && *temp > 30000 && anya_thermal_enabled) {
 		*temp = 30000 + ((*temp - 30000) / 8);
 		if (*temp > 40000)
 			*temp = 40000;
