@@ -23,7 +23,6 @@ extern int vm_swappiness;
 static void apply_swappiness_cb(void)
 {
 	vm_swappiness = sparxie_swappiness_val;
-	pr_info("sparxie: vm_swappiness forcefully applied -> %d\n", sparxie_swappiness_val);
 }
 
 static int __init sparxie_swap_init(void)

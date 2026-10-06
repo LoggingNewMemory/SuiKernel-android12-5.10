@@ -116,7 +116,6 @@ static void inaho_boost_audio_threads(void)
 
 		if (!rt_task(p)) {
 			sched_setscheduler_nocheck(p, SCHED_FIFO, &param);
-			pr_info("inaho: boosted %s (pid %d) -> SCHED_FIFO\n",
 				p->comm, p->pid);
 			boosted++;
 		}
@@ -125,7 +124,6 @@ static void inaho_boost_audio_threads(void)
 	}
 
 	if (boosted > 0)
-		pr_info("inaho: %d audio thread(s) boosted to SCHED_FIFO\n",
 			boosted);
 }
 

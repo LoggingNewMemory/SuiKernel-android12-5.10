@@ -147,7 +147,6 @@ static int airani_worker(void *data)
 
 				cleaned = strim(current_mask);
 				if (strstr(cleaned, all_cores_str) == NULL) {
-					pr_info("iofi: Watchdog caught vendor rollback ('%s')! Re-enforcing.\n",
 						cleaned);
 					airani_execute_cpuset_override();
 				}

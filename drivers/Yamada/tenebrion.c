@@ -173,7 +173,6 @@ static void tenebrion_cpuset_restrict(void)
     tenebrion_read_file(CPUSET_SYSBG_PATH, saved_sysbg_cpus, sizeof(saved_sysbg_cpus));
 
     if (tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF) == 0)
-        pr_info("tenebrion: system-background cpuset → 0\n");
 }
 
 static void tenebrion_cpuset_restore(void)
@@ -190,7 +189,6 @@ static void tenebrion_cpuset_restore(void)
              saved_sysbg_cpus[0] ? saved_sysbg_cpus : fallback_mask);
 
     if (tenebrion_write_file(CPUSET_SYSBG_PATH, sysbg_buf) == 0)
-        pr_info("tenebrion: system-background cpuset restored → %s", sysbg_buf);
 }
 
 /* ------------------------------------------------------------------ */
@@ -256,7 +254,6 @@ static void tenebrion_set_min_freq(void)
             freq_qos_update_request(&tenebrion_max_req[cpu],
                                     policy->cpuinfo.min_freq);
 
-            pr_info("tenebrion: policy%u → %u KHz (screen off)\n",
                     cpu, policy->cpuinfo.min_freq);
         }
 
@@ -289,7 +286,6 @@ static void tenebrion_restore_freq(void)
             freq_qos_update_request(&tenebrion_min_req[cpu],
                                     policy->cpuinfo.min_freq);
 
-            pr_info("tenebrion: policy%u restored min=%u max=%u KHz\n",
                     cpu,
                     policy->cpuinfo.min_freq,
                     policy->cpuinfo.max_freq);
@@ -326,7 +322,6 @@ static void tenebrion_on_screen_off(void)
     tenebrion_set_min_freq();
     tenebrion_cpuset_restrict();
     is_screen_off = true;
-    pr_info("tenebrion: screen OFF → CPUs throttled + cpuset restricted "
             "(online CPUs: %u)\n", num_online_cpus());
 }
 
@@ -335,7 +330,6 @@ static void tenebrion_on_screen_on(void)
     tenebrion_restore_freq();
     tenebrion_cpuset_restore();
     is_screen_off = false;
-    pr_info("tenebrion: screen ON → CPUs restored + cpuset restored\n");
 }
 
 /* ------------------------------------------------------------------ */

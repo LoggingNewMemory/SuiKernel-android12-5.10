@@ -36,7 +36,6 @@ static void do_boost_off(struct work_struct *work) {
 		cpufreq_update_policy(cpu);
 	}
 
-	pr_info("yamada_touch_boost: touch boost OFF\n");
 }
 
 static void kobo_trigger_boost(void) {
@@ -48,7 +47,6 @@ static void kobo_trigger_boost(void) {
 	spin_lock_irqsave(&boost_lock, flags);
 	if (!yamada_is_boosted) {
 		WRITE_ONCE(yamada_is_boosted, true);
-		pr_info("yamada_touch_boost: touch boost ON\n");
 	}
 	spin_unlock_irqrestore(&boost_lock, flags);
 

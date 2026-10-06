@@ -98,7 +98,6 @@ static void anya_disable_all_zones(void)
             continue;
         }
 
-        pr_info("anya_disable_thermal: zone%d disabled\n", i);
         disabled_count++;
     }
 

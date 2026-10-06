@@ -937,32 +937,41 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;
+		pr_info("SuiKernel IOCTL: Anya Thermal set to %s\n", anya_thermal_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_DISABLE:
 		yamada_touch_boost_enabled = false;
+		pr_info("SuiKernel IOCTL: Yamada Touch Boost set to Disabled\n");
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_BALANCED:
 		yamada_touch_boost_enabled = true;
 		yamada_touch_boost_duration = 100;
+		pr_info("SuiKernel IOCTL: Yamada Touch Boost set to Balanced\n");
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_GAMING:
 		yamada_touch_boost_enabled = true;
 		yamada_touch_boost_duration = 300;
+		pr_info("SuiKernel IOCTL: Yamada Touch Boost set to Gaming\n");
 		return 0;
 	case CMD_INAHO_AUDIO:
 		inaho_enabled = (bool)arg;
+		pr_info("SuiKernel IOCTL: Inaho Audio set to %s\n", inaho_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_TENEBRION:
 		tenebrion_enabled = (bool)arg;
+		pr_info("SuiKernel IOCTL: Tenebrion set to %s\n", tenebrion_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_SPARXIE_SWAP:
 		sparxie_swappiness_val = (int)arg;
+		pr_info("SuiKernel IOCTL: Sparxie Swappiness set to %d\n", sparxie_swappiness_val);
 		return 0;
 	case CMD_AIRANI_CPUSET:
 		airani_enabled = (bool)arg;
+		pr_info("SuiKernel IOCTL: Airani CPUset set to %s\n", airani_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_SANDEVISTAN:
 		sandevistan_enabled = (bool)arg;
+		pr_info("SuiKernel IOCTL: Sandevistan set to %s\n", sandevistan_enabled ? "Enabled" : "Disabled");
 		return 0;
 	default:
 		return -ENOTTY;
