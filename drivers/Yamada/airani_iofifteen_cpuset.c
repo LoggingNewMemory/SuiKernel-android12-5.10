@@ -22,7 +22,6 @@ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 bool airani_enabled = true;
 
-static struct task_struct *airani_thread;
 static char all_cores_str[64];
 static char no_prime_cores_str[64];
 static char little_cores_str[64];

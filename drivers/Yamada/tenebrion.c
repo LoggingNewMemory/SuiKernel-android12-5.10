@@ -7,17 +7,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
-#include <linux/kthread.h>
-#include <linux/delay.h>
 #include <linux/mutex.h>
 #include <linux/fs.h>
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
+#include <linux/fb.h>
 
-#define POLL_INTERVAL_MS    3000
-#define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
-#define BACKLIGHT_PATH      "/sys/class/leds/lcd-backlight/brightness"
 
 // cpuset paths that get restricted when screen is off.
 // top-app / foreground are intentionally left alone — the system
@@ -27,18 +23,9 @@
 
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
-enum tenebrion_path {
-    PATH_NONE        = 0,   /* not yet found — keep retrying            */
-    PATH_DPMS        = 1,   /* /sys/class/drm/.../dpms                  */
-    PATH_BACKLIGHT   = 2,   /* /sys/class/leds/.../brightness           */
-    PATH_UNSUPPORTED = 3,   /* tried and failed — stop searching        */
-};
-
-static enum tenebrion_path active_path = PATH_NONE;
 bool tenebrion_enabled = true;
 static bool is_screen_off = false;
 static DEFINE_MUTEX(tenebrion_lock);
-static struct task_struct *watcher_thread;
 
 /* QoS requests per policy CPU */
 static struct freq_qos_request tenebrion_min_req[NR_CPUS];
@@ -89,58 +76,6 @@ static int tenebrion_write_file(const char *path, const char *buf)
     filp_close(f, NULL);
 
     return ret > 0 ? 0 : -1;
-}
-
-// Path auto-detection                                                  
-// Tries both known paths once; if neither works, marks UNSUPPORTED.
-
-static enum tenebrion_path tenebrion_detect_path(void)
-{
-    char buf[64];
-
-    if (tenebrion_read_file(DPMS_PATH, buf, sizeof(buf)) > 0) {
-        pr_info("tenebrion: detected path → %s\n", DPMS_PATH);
-        return PATH_DPMS;
-    }
-
-    if (tenebrion_read_file(BACKLIGHT_PATH, buf, sizeof(buf)) > 0) {
-        pr_info("tenebrion: detected path → %s\n", BACKLIGHT_PATH);
-        return PATH_BACKLIGHT;
-    }
-
-    pr_err("tenebrion: no supported screen state path found — disabling\n");
-    return PATH_UNSUPPORTED;
-}
-
-// Screen state detection
-// Returns: 1 = on, 0 = off, -1 = unknown
-static int tenebrion_get_screen_state(void)
-{
-    char buf[64];
-    int len;
-
-    switch (active_path) {
-    case PATH_DPMS:
-        len = tenebrion_read_file(DPMS_PATH, buf, sizeof(buf));
-        if (len <= 0)
-            return -1;
-        if (strstr(buf, "On"))
-            return 1;
-        if (strstr(buf, "Off"))
-            return 0;
-        return -1;
-
-    case PATH_BACKLIGHT:
-        len = tenebrion_read_file(BACKLIGHT_PATH, buf, sizeof(buf));
-        if (len <= 0)
-            return -1;
-        if (simple_strtol(buf, NULL, 10) > 0)
-            return 1;
-        return 0;
-
-    default:
-        return -1;
-    }
 }
 
 // cpuset helpers
@@ -299,8 +234,6 @@ static void tenebrion_on_screen_on(void)
 }
 
 // FB Notifier
-
-#include <linux/fb.h>
 
 static int tenebrion_fb_notifier_callback(struct notifier_block *self,
 					 unsigned long event, void *data)
