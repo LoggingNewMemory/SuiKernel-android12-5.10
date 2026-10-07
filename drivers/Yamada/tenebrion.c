@@ -253,10 +253,7 @@ static void tenebrion_set_min_freq(void)
                                     policy->cpuinfo.min_freq);
             freq_qos_update_request(&tenebrion_max_req[cpu],
                                     policy->cpuinfo.min_freq);
-
-                    cpu, policy->cpuinfo.min_freq);
         }
-
         cpufreq_cpu_put(policy);
     }
 }
@@ -285,12 +282,7 @@ static void tenebrion_restore_freq(void)
                                     policy->cpuinfo.max_freq);
             freq_qos_update_request(&tenebrion_min_req[cpu],
                                     policy->cpuinfo.min_freq);
-
-                    cpu,
-                    policy->cpuinfo.min_freq,
-                    policy->cpuinfo.max_freq);
         }
-
         cpufreq_cpu_put(policy);
     }
 }
@@ -322,7 +314,6 @@ static void tenebrion_on_screen_off(void)
     tenebrion_set_min_freq();
     tenebrion_cpuset_restrict();
     is_screen_off = true;
-            "(online CPUs: %u)\n", num_online_cpus());
 }
 
 static void tenebrion_on_screen_on(void)

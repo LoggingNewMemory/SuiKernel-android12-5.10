@@ -116,15 +116,11 @@ static void inaho_boost_audio_threads(void)
 
 		if (!rt_task(p)) {
 			sched_setscheduler_nocheck(p, SCHED_FIFO, &param);
-				p->comm, p->pid);
 			boosted++;
 		}
 
 		put_task_struct(p);
 	}
-
-	if (boosted > 0)
-			boosted);
 }
 
 /* ------------------------------------------------------------------ */

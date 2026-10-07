@@ -147,7 +147,6 @@ static int airani_worker(void *data)
 
 				cleaned = strim(current_mask);
 				if (strstr(cleaned, all_cores_str) == NULL) {
-						cleaned);
 					airani_execute_cpuset_override();
 				}
 			}
