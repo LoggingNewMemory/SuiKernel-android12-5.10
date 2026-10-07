@@ -311,6 +311,8 @@ static void tenebrion_qos_cleanup(void)
 
 static void tenebrion_on_screen_off(void)
 {
+    if (!tenebrion_enabled) return;
+
     tenebrion_set_min_freq();
     tenebrion_cpuset_restrict();
     is_screen_off = true;
@@ -324,78 +326,48 @@ static void tenebrion_on_screen_on(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Watcher kthread                                                      */
+/* FB Notifier                                                          */
 /* ------------------------------------------------------------------ */
 
-static int tenebrion_watcher(void *data)
+#include <linux/fb.h>
+
+static int tenebrion_fb_notifier_callback(struct notifier_block *self,
+					 unsigned long event, void *data)
 {
-    int current_state = -1;
-    int last_state    = -1;
+	struct fb_event *evdata = data;
+	int *blank;
 
-    pr_info("tenebrion: watcher started, polling every %dms\n",
-            POLL_INTERVAL_MS);
+	if (event != FB_EVENT_BLANK)
+		return 0;
 
-    /* Wait for Android SELinux policy + KernelSU rules to be applied */
-    msleep(40000);
+	blank = evdata->data;
 
-    /*
-     * If init already flagged UNSUPPORTED, there is nothing to do.
-     * Exit the thread cleanly rather than burning cycles forever.
-     */
-    if (active_path == PATH_UNSUPPORTED) {
-        pr_info("tenebrion: path unsupported — watcher exiting\n");
-        return 0;
-    }
+	mutex_lock(&tenebrion_lock);
 
-    /* Initialize QoS requests after the boot delay */
+	if (*blank == FB_BLANK_UNBLANK) {
+		if (is_screen_off)
+			tenebrion_on_screen_on();
+	} else if (*blank == FB_BLANK_POWERDOWN) {
+		if (!is_screen_off && tenebrion_enabled)
+			tenebrion_on_screen_off();
+	}
+
+	mutex_unlock(&tenebrion_lock);
+	return 0;
+}
+
+static struct notifier_block tenebrion_fb_notif = {
+	.notifier_call = tenebrion_fb_notifier_callback,
+};
+
+static struct delayed_work tenebrion_init_work;
+
+static void tenebrion_init_worker(struct work_struct *work)
+{
+    pr_info("tenebrion: late init started\n");
     tenebrion_qos_init();
-
-    while (!kthread_should_stop()) {
-        /*
-         * PATH_NONE: detection was inconclusive at init (race with
-         * driver probe). Try once more. If it fails this time, mark
-         * UNSUPPORTED and stop the loop — no point hammering sysfs
-         * every 3 s forever.
-         */
-        if (active_path == PATH_NONE) {
-            active_path = tenebrion_detect_path();
-            if (active_path == PATH_UNSUPPORTED) {
-                pr_info("tenebrion: retry failed — watcher exiting\n");
-                break;
-            }
-        }
-
-
-        current_state = tenebrion_get_screen_state();
-        
-        if (!tenebrion_enabled) {
-            if (is_screen_off) {
-                mutex_lock(&tenebrion_lock);
-                tenebrion_on_screen_on();
-                mutex_unlock(&tenebrion_lock);
-                last_state = 1;
-            }
-            msleep_interruptible(POLL_INTERVAL_MS);
-            continue;
-        }
-
-
-        if (current_state != -1 && current_state != last_state) {
-            mutex_lock(&tenebrion_lock);
-
-            if (current_state == 0 && !is_screen_off)
-                tenebrion_on_screen_off();
-            else if (current_state == 1 && is_screen_off)
-                tenebrion_on_screen_on();
-
-            mutex_unlock(&tenebrion_lock);
-            last_state = current_state;
-        }
-
-        msleep_interruptible(POLL_INTERVAL_MS);
-    }
-
-    return 0;
+    fb_register_client(&tenebrion_fb_notif);
+    pr_info("tenebrion: fb_notifier registered. Screen state hooks active.\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -405,23 +377,18 @@ static int tenebrion_watcher(void *data)
 static int __init tenebrion_init(void)
 {
     memset(qos_initialized, 0, sizeof(qos_initialized));
-    active_path = PATH_NONE;
 
-    watcher_thread = kthread_run(tenebrion_watcher, NULL, "tenebrion");
-    if (IS_ERR(watcher_thread)) {
-        pr_err("tenebrion: failed to start watcher thread: %ld\n",
-               PTR_ERR(watcher_thread));
-        return PTR_ERR(watcher_thread);
-    }
+    INIT_DELAYED_WORK(&tenebrion_init_work, tenebrion_init_worker);
+    schedule_delayed_work(&tenebrion_init_work, msecs_to_jiffies(40000));
 
-    pr_info("tenebrion: active — path=%d poll=%dms possible_cpus=%u\n",
-            active_path, POLL_INTERVAL_MS, num_possible_cpus());
+    pr_info("tenebrion: active — using fb_notifier\n");
     return 0;
 }
 
 static void __exit tenebrion_exit(void)
 {
-    kthread_stop(watcher_thread);
+    cancel_delayed_work_sync(&tenebrion_init_work);
+    fb_unregister_client(&tenebrion_fb_notif);
 
     if (is_screen_off) {
         mutex_lock(&tenebrion_lock);

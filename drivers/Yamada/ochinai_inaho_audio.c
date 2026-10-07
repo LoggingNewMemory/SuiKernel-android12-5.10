@@ -41,13 +41,6 @@ bool inaho_enabled = true;
 static struct pm_qos_request inaho_pm_qos;
 static bool pm_qos_active;
 
-static struct task_struct *inaho_thread;
-
-/*
- * Watchdog thread settings
- */
-#define AUDIO_SCAN_MS 5000
-
 /* ------------------------------------------------------------------ */
 /* Audio thread name table                                              */
 /* ------------------------------------------------------------------ */
@@ -70,58 +63,82 @@ static const char * const audio_threads[] = {
 /* Feature 1 — SCHED_FIFO boost for audio threads (RCU-safe)          */
 /* ------------------------------------------------------------------ */
 
-static void inaho_boost_audio_threads(void)
+static void inaho_boost_task(pid_t pid)
 {
 	struct task_struct *p;
 	struct sched_param param = { .sched_priority = 2 };
-	pid_t pids[MAX_AUDIO_PIDS];
-	int count = 0;
-	int boosted = 0;
-	int i, j;
 
-	/*
-	 * Phase 1 — collect matching PIDs under RCU.
-	 * We must NOT call sched_setscheduler_nocheck() here; it acquires
-	 * pi_lock + rq->lock which violates the RCU read-side contract.
-	 */
 	rcu_read_lock();
-	for_each_process(p) {
-		if (count >= MAX_AUDIO_PIDS)
-			break;
-		for (i = 0; audio_threads[i]; i++) {
-			if (strncmp(p->comm, audio_threads[i],
-				    TASK_COMM_LEN) == 0) {
-				pids[count++] = p->pid;
-				break;
-			}
-		}
-	}
+	p = find_task_by_vpid(pid);
+	if (p)
+		get_task_struct(p);
 	rcu_read_unlock();
 
-	/*
-	 * Phase 2 — apply scheduler change outside RCU.
-	 * Re-look up the task by PID under a fresh RCU critical section and
-	 * pin it with get_task_struct() so it cannot be freed between the
-	 * lookup and the sched_setscheduler_nocheck() call.
-	 */
-	for (j = 0; j < count; j++) {
-		rcu_read_lock();
-		p = find_task_by_vpid(pids[j]);
-		if (p)
-			get_task_struct(p);
-		rcu_read_unlock();
+	if (!p)
+		return;
 
-		if (!p)
-			continue;
+	if (!rt_task(p)) {
+		sched_setscheduler_nocheck(p, SCHED_FIFO, &param);
+		pr_info("inaho: upgraded thread %s (PID %d) to SCHED_FIFO\n", p->comm, pid);
+	}
 
-		if (!rt_task(p)) {
-			sched_setscheduler_nocheck(p, SCHED_FIFO, &param);
-			boosted++;
-		}
+	put_task_struct(p);
+}
 
-		put_task_struct(p);
+/* 
+ * Async work to apply scheduler changes safely outside of atomic contexts
+ */
+struct inaho_boost_work {
+	struct work_struct work;
+	pid_t pid;
+};
+
+static void inaho_boost_work_func(struct work_struct *work)
+{
+	struct inaho_boost_work *bw = container_of(work, struct inaho_boost_work, work);
+	inaho_boost_task(bw->pid);
+	kfree(bw);
+}
+
+static void inaho_queue_boost(pid_t pid)
+{
+	struct inaho_boost_work *bw = kmalloc(sizeof(*bw), GFP_ATOMIC);
+	if (bw) {
+		bw->pid = pid;
+		INIT_WORK(&bw->work, inaho_boost_work_func);
+		schedule_work(&bw->work);
 	}
 }
+
+/* ------------------------------------------------------------------ */
+/* Kprobe on __set_task_comm                                            */
+/* ------------------------------------------------------------------ */
+
+#include <linux/kprobes.h>
+
+static int inaho_set_task_comm_pre(struct kprobe *p, struct pt_regs *regs)
+{
+	/* ARM64 calling convention: arg0 is x0, arg1 is x1 */
+	struct task_struct *tsk = (struct task_struct *)regs->regs[0];
+	const char *buf = (const char *)regs->regs[1];
+	int i;
+
+	if (!inaho_enabled || !tsk || !buf)
+		return 0;
+
+	for (i = 0; audio_threads[i]; i++) {
+		if (strncmp(buf, audio_threads[i], TASK_COMM_LEN) == 0) {
+			inaho_queue_boost(tsk->pid);
+			break;
+		}
+	}
+	return 0;
+}
+
+static struct kprobe inaho_kprobe = {
+	.symbol_name = "__set_task_comm",
+	.pre_handler = inaho_set_task_comm_pre,
+};
 
 /* ------------------------------------------------------------------ */
 /* Feature 2 — PM QoS latency guard                                    */
@@ -138,51 +155,33 @@ static void inaho_pm_qos_engage(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Worker thread                                                        */
-/* ------------------------------------------------------------------ */
-
-static int inaho_worker(void *data)
-{
-	pr_info("inaho: standing by — engaging in %d ms\n", ENGAGE_DELAY_MS);
-	msleep(ENGAGE_DELAY_MS);
-
-	inaho_pm_qos_engage();
-
-	while (!kthread_should_stop()) {
-		inaho_boost_audio_threads();
-
-		msleep_interruptible(AUDIO_SCAN_MS);
-	}
-
-	return 0;
-}
-
-/* ------------------------------------------------------------------ */
 /* Module init / exit                                                   */
 /* ------------------------------------------------------------------ */
 
 static int __init inaho_audio_enhance_init(void)
 {
+	int ret;
+
 	if (!inaho_enabled) {
 		pr_info("inaho: disabled via module param\n");
 		return 0;
 	}
 
-	inaho_thread = kthread_run(inaho_worker, NULL, "inaho_audio");
-	if (IS_ERR(inaho_thread)) {
-		pr_err("inaho: failed to start thread: %ld\n",
-		       PTR_ERR(inaho_thread));
-		return PTR_ERR(inaho_thread);
+	inaho_pm_qos_engage();
+
+	ret = register_kprobe(&inaho_kprobe);
+	if (ret < 0) {
+		pr_err("inaho: failed to register kprobe: %d\n", ret);
+		return ret;
 	}
 
-	pr_info("inaho: active\n");
+	pr_info("inaho: active — kprobes hooked\n");
 	return 0;
 }
 
 static void __exit inaho_audio_enhance_exit(void)
 {
-	if (inaho_thread)
-		kthread_stop(inaho_thread);
+	unregister_kprobe(&inaho_kprobe);
 
 	if (pm_qos_active) {
 		cpu_latency_qos_remove_request(&inaho_pm_qos);

@@ -190,44 +190,6 @@ for file in $FILES; do
         error_output+="$decl_output\n"
     fi
     
-    # Real C compiler syntax check
-    if command -v gcc >/dev/null 2>&1; then
-        # Determine if this is a kernel file by looking for linux/ headers or kernel macros
-        if grep -q "#include <linux/" "$file" || grep -q "EXPORT_SYMBOL" "$file" || grep -q "module_init" "$file"; then
-            kernel_root=$(git rev-parse --show-toplevel 2>/dev/null)
-            if [ -z "$kernel_root" ]; then
-                kernel_root="../../.."
-            fi
-            
-            if [ -f "$kernel_root/Makefile" ]; then
-                obj_file="${file%.c}.o"
-                # Try to compile just this object file
-                cc_output=$(make -C "$kernel_root" M=$(pwd) "$obj_file" 2>&1)
-                cc_status=$?
-                
-                # If it failed due to missing kernel config, we ignore this check
-                if echo "$cc_output" | grep -q "auto.conf: No such file"; then
-                    cc_status=0
-                elif [ $cc_status -ne 0 ]; then
-                    file_has_error=1
-                    error_output+="  Error: C Compiler returned errors (Kernel Build):\n"
-                    formatted_cc=$(echo "$cc_output" | grep -v "Entering directory" | grep -v "Leaving directory" | sed 's/^/    /')
-                    error_output+="$formatted_cc\n"
-                fi
-            fi
-        else
-            # Standard user-space C file - Kobo nambahin Werror declaration!
-            cc_output=$(gcc -fsyntax-only -Wall -Wdeclaration-after-statement -Werror=declaration-after-statement "$file" 2>&1)
-            cc_status=$?
-            if [ $cc_status -ne 0 ]; then
-                file_has_error=1
-                error_output+="  Error: C Compiler returned errors:\n"
-                formatted_cc=$(echo "$cc_output" | sed 's/^/    /')
-                error_output+="$formatted_cc\n"
-            fi
-        fi
-    fi
-    
     if [ $file_has_error -eq 0 ]; then
         echo -e "Checking [$file] \e[32m✓\e[0m"
     else

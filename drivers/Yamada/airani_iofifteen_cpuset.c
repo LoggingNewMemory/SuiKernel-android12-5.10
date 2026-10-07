@@ -97,6 +97,11 @@ I use ColorOS Port ROM (Which probably of course won't exist on other ROMs)
 
 static void airani_execute_cpuset_override(void)
 {
+	if (!airani_enabled) {
+		pr_info("iofi: aborted by Manager IOCTL\n");
+		return;
+	}
+
 	if (!masks_calculated)
 		airani_calculate_dynamic_masks();
 
@@ -122,42 +127,6 @@ static void airani_execute_cpuset_override(void)
 	airani_write_file("/dev/cpuset/h-background/cpus", little_cores_str);
 }
 
-static int airani_worker(void *data)
-{
-	pr_info("iofi: standing by — engaging in %d ms\n", ENGAGE_DELAY_MS);
-	msleep(ENGAGE_DELAY_MS);
-
-	airani_execute_cpuset_override();
-
-	while (!kthread_should_stop()) {
-		/*
-		 * Watchdog: check top-app to ensure the vendor hasn't rolled it back
-		 */
-		{
-			struct file *f = filp_open("/dev/cpuset/top-app/cpus",
-						   O_RDONLY, 0);
-			if (!IS_ERR(f)) {
-				char current_mask[32] = {0};
-				char *cleaned;
-				loff_t pos = 0;
-
-				kernel_read(f, current_mask,
-					    sizeof(current_mask) - 1, &pos);
-				filp_close(f, NULL);
-
-				cleaned = strim(current_mask);
-				if (strstr(cleaned, all_cores_str) == NULL) {
-					airani_execute_cpuset_override();
-				}
-			}
-		}
-
-		msleep_interruptible(CPUSET_SCAN_MS);
-	}
-
-	return 0;
-}
-
 static int __init airani_cpuset_init(void)
 {
 	if (!airani_enabled) {
@@ -170,23 +139,12 @@ static int __init airani_cpuset_init(void)
 	else
 		pr_warn("iofi: Raco hook failed, continuing without it\n");
 
-	airani_thread = kthread_run(airani_worker, NULL, "airani_cpuset");
-	if (IS_ERR(airani_thread)) {
-		pr_err("iofi: failed to start thread: %ld\n",
-		       PTR_ERR(airani_thread));
-		raco_unregister_rc_override(airani_execute_cpuset_override);
-		return PTR_ERR(airani_thread);
-	}
-
 	pr_info("iofi: active\n");
 	return 0;
 }
 
 static void __exit airani_cpuset_exit(void)
 {
-	if (airani_thread)
-		kthread_stop(airani_thread);
-
 	raco_unregister_rc_override(airani_execute_cpuset_override);
 
 	pr_info("iofi: unloaded\n");
