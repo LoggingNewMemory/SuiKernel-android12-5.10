@@ -114,8 +114,13 @@ static int anya_thermal_worker(void *data)
     pr_info("anya_disable_thermal: standing by — engaging in %dms\n",
             DISABLE_DELAY_MS);
 
-    /* Wait for KernelSU SELinux rules to be applied */
+    /* Wait for KernelSU SELinux rules and IOCTLs to be applied */
     msleep(DISABLE_DELAY_MS);
+
+    if (!anya_thermal_enabled) {
+        pr_info("anya_disable_thermal: aborted by Manager IOCTL\n");
+        return 0;
+    }
 
     pr_info("anya_disable_thermal: disabling all thermal zones\n");
     anya_disable_all_zones();

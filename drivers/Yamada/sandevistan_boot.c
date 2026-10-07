@@ -27,6 +27,11 @@ static void do_boost(struct work_struct *work)
     unsigned int cpu;
     struct cpufreq_policy *policy;
 
+    if (!sandevistan_enabled) {
+        pr_info("sandevistan_boot: aborted by Manager IOCTL\n");
+        return;
+    }
+
     pr_info("sandevistan_boot: jacking in — locking min=max via QoS\n");
 
     for_each_online_cpu(cpu) {
