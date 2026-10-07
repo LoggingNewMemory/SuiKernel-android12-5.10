@@ -172,7 +172,7 @@ static void tenebrion_cpuset_restrict(void)
     /* Save current mask before overriding */
     tenebrion_read_file(CPUSET_SYSBG_PATH, saved_sysbg_cpus, sizeof(saved_sysbg_cpus));
 
-    if (tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF) == 0)
+    tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF);
 }
 
 static void tenebrion_cpuset_restore(void)
@@ -188,7 +188,7 @@ static void tenebrion_cpuset_restore(void)
     snprintf(sysbg_buf, sizeof(sysbg_buf), "%s\n", 
              saved_sysbg_cpus[0] ? saved_sysbg_cpus : fallback_mask);
 
-    if (tenebrion_write_file(CPUSET_SYSBG_PATH, sysbg_buf) == 0)
+    tenebrion_write_file(CPUSET_SYSBG_PATH, sysbg_buf);
 }
 
 /* ------------------------------------------------------------------ */
