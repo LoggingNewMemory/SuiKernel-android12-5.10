@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/*
- * ochinai_inaho_audio.c
- * Ochinai Inaho Audio — SCHED_FIFO boost + PM QoS + Raco CPUSet API
- * Author: Kanagawa Yamada
- */
+// ochinai_inaho_audio.c
+// Ochinai Inaho Audio — SCHED_FIFO boost + PM QoS + Raco CPUSet API
+// Author: Kanagawa Yamada
 
+#include <linux/kprobes.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -25,44 +24,25 @@
 
 #define ENGAGE_DELAY_MS     20000
 #define AUDIO_SCAN_MS        5000
-#define PM_QOS_LATENCY_US     100   /* Max CPU latency — prevents deep idle */
-#define MAX_AUDIO_PIDS         64   /* Upper bound for PID collection array  */
-
-/* ------------------------------------------------------------------ */
-/* Module parameter                                                     */
-/* ------------------------------------------------------------------ */
+#define PM_QOS_LATENCY_US     100
+#define MAX_AUDIO_PIDS         64
 
 bool inaho_enabled = true;
-
-/* ------------------------------------------------------------------ */
-/* State                                                                */
-/* ------------------------------------------------------------------ */
 
 static struct pm_qos_request inaho_pm_qos;
 static bool pm_qos_active;
 
-/* ------------------------------------------------------------------ */
-/* Audio thread name table                                              */
-/* ------------------------------------------------------------------ */
-
+// Audio threads
 static const char * const audio_threads[] = {
 	"audioserver",
 	"AudioOut",
 	"AudioIn",
 	"FastMixer",
 	"FastCapture",
-	"AudioFlinger",
-	"AudioTrack",
-	"AudioRecord",
-	"audio.r_submix",
-	"usb_audio_wq",
 	NULL
 };
 
-/* ------------------------------------------------------------------ */
-/* Feature 1 — SCHED_FIFO boost for audio threads (RCU-safe)          */
-/* ------------------------------------------------------------------ */
-
+// SCHED_FIFO boost for audio threads
 static void inaho_boost_task(pid_t pid)
 {
 	struct task_struct *p;
@@ -79,15 +59,11 @@ static void inaho_boost_task(pid_t pid)
 
 	if (!rt_task(p)) {
 		sched_setscheduler_nocheck(p, SCHED_FIFO, &param);
-		pr_info("inaho: upgraded thread %s (PID %d) to SCHED_FIFO\n", p->comm, pid);
 	}
 
 	put_task_struct(p);
 }
 
-/* 
- * Async work to apply scheduler changes safely outside of atomic contexts
- */
 struct inaho_boost_work {
 	struct work_struct work;
 	pid_t pid;
@@ -110,15 +86,8 @@ static void inaho_queue_boost(pid_t pid)
 	}
 }
 
-/* ------------------------------------------------------------------ */
-/* Kprobe on __set_task_comm                                            */
-/* ------------------------------------------------------------------ */
-
-#include <linux/kprobes.h>
-
 static int inaho_set_task_comm_pre(struct kprobe *p, struct pt_regs *regs)
 {
-	/* ARM64 calling convention: arg0 is x0, arg1 is x1 */
 	struct task_struct *tsk = (struct task_struct *)regs->regs[0];
 	const char *buf = (const char *)regs->regs[1];
 	int i;
@@ -140,10 +109,6 @@ static struct kprobe inaho_kprobe = {
 	.pre_handler = inaho_set_task_comm_pre,
 };
 
-/* ------------------------------------------------------------------ */
-/* Feature 2 — PM QoS latency guard                                    */
-/* ------------------------------------------------------------------ */
-
 static void inaho_pm_qos_engage(void)
 {
 	if (pm_qos_active)
@@ -151,12 +116,7 @@ static void inaho_pm_qos_engage(void)
 
 	cpu_latency_qos_add_request(&inaho_pm_qos, PM_QOS_LATENCY_US);
 	pm_qos_active = true;
-	pr_info("inaho: PM QoS latency locked to %d us\n", PM_QOS_LATENCY_US);
 }
-
-/* ------------------------------------------------------------------ */
-/* Module init / exit                                                   */
-/* ------------------------------------------------------------------ */
 
 static int __init inaho_audio_enhance_init(void)
 {

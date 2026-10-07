@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/*
-See the codes for the props used by spoofing
-*/
+// See the codes for the props used by spoofing
 
 #include <linux/module.h>
 #include <linux/init.h>

@@ -6,7 +6,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/kthread.h>
+#include <linux/workqueue.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
@@ -19,11 +19,7 @@ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 bool anya_thermal_enabled = true;
 
-static struct task_struct *anya_thermal_thread;
-
-/* ------------------------------------------------------------------ */
-/* File write helper                                                    */
-/* ------------------------------------------------------------------ */
+// File write helper
 
 static int anya_write_file(const char *path, const char *buf)
 {
@@ -41,9 +37,7 @@ static int anya_write_file(const char *path, const char *buf)
     return ret < 0 ? ret : 0;
 }
 
-/* ------------------------------------------------------------------ */
-/* File read helper                                                     */
-/* ------------------------------------------------------------------ */
+// File read helper
 
 static int anya_read_file(const char *path, char *buf, size_t size)
 {
@@ -66,9 +60,7 @@ static int anya_read_file(const char *path, char *buf, size_t size)
     return ret;
 }
 
-/* ------------------------------------------------------------------ */
-/* Disable all thermal zones                                            */
-/* ------------------------------------------------------------------ */
+// Disable all thermal zones
 
 static void anya_disable_all_zones(void)
 {
@@ -105,32 +97,22 @@ static void anya_disable_all_zones(void)
             disabled_count);
 }
 
-/* ------------------------------------------------------------------ */
-/* Worker thread                                                        */
-/* ------------------------------------------------------------------ */
+static struct delayed_work anya_thermal_work;
 
-static int anya_thermal_worker(void *data)
+// Worker work_struct
+
+static void anya_thermal_worker(struct work_struct *work)
 {
-    pr_info("anya_disable_thermal: standing by — engaging in %dms\n",
-            DISABLE_DELAY_MS);
-
-    /* Wait for KernelSU SELinux rules and IOCTLs to be applied */
-    msleep(DISABLE_DELAY_MS);
-
     if (!anya_thermal_enabled) {
         pr_info("anya_disable_thermal: aborted by Manager IOCTL\n");
-        return 0;
+        return;
     }
 
     pr_info("anya_disable_thermal: disabling all thermal zones\n");
     anya_disable_all_zones();
-
-    return 0;
 }
 
-/* ------------------------------------------------------------------ */
-/* Init / Exit                                                          */
-/* ------------------------------------------------------------------ */
+// Init / Exit
 
 static int __init anya_disable_thermal_init(void)
 {
@@ -139,13 +121,11 @@ static int __init anya_disable_thermal_init(void)
         return 0;
     }
 
-    anya_thermal_thread = kthread_run(anya_thermal_worker, NULL,
-                                      "anya_disable_thermal");
-    if (IS_ERR(anya_thermal_thread)) {
-        pr_err("anya_disable_thermal: failed to start thread: %ld\n",
-               PTR_ERR(anya_thermal_thread));
-        return PTR_ERR(anya_thermal_thread);
-    }
+    INIT_DELAYED_WORK(&anya_thermal_work, anya_thermal_worker);
+    pr_info("anya_disable_thermal: standing by — engaging in %dms\n",
+            DISABLE_DELAY_MS);
+            
+    schedule_delayed_work(&anya_thermal_work, msecs_to_jiffies(DISABLE_DELAY_MS));
 
     pr_info("anya_disable_thermal: active\n");
     return 0;
@@ -153,6 +133,7 @@ static int __init anya_disable_thermal_init(void)
 
 static void __exit anya_disable_thermal_exit(void)
 {
+    cancel_delayed_work_sync(&anya_thermal_work);
     pr_info("anya_disable_thermal: unloaded\n");
 }
 

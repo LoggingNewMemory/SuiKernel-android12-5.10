@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/*
- * airani_iofifteen_cpuset.c
- * Airani Iofifteen — Maximum CPUSet Tweaks (Raco API)
- * Author: Kanagawa Yamada
- */
+// airani_iofifteen_cpuset.c
+// Airani Iofifteen — Maximum CPUSet Tweaks (Raco API)
+// Author: Kanagawa Yamada
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -88,12 +86,10 @@ static void airani_calculate_dynamic_masks(void)
 	masks_calculated = true;
 }
 
-/*
-Yamada Note: 
-Well this thing is actually pretty stupid since I don't know every devices
-cpuset dirs, but I don't have any other way. I added oiface, etc it's because
-I use ColorOS Port ROM (Which probably of course won't exist on other ROMs)
-*/
+// Yamada Note:
+// Well this thing is actually pretty stupid since I don't know every devices
+// cpuset dirs, but I don't have any other way. I added oiface, etc it's because
+// I use ColorOS Port ROM (Which probably of course won't exist on other ROMs)
 
 static void airani_execute_cpuset_override(void)
 {

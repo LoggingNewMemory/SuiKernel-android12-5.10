@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/*
- * sparxie_swapiness_tuner.c
- * Sparxie Swappiness Tuner — Delegated to Raco Engine API
- * Author: Kanagawa Yamada
- */
+// sparxie_swapiness_tuner.c
+// Sparxie Swappiness Tuner — Delegated to Raco Engine API
+// Author: Kanagawa Yamada
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -16,10 +14,8 @@ int sparxie_swappiness_val = 30;
 
 extern int vm_swappiness;
 
-/*
- * We simply define a callback function that Raco will execute every 5s.
- * This actively pushes our value back into vm_swappiness, fighting vendor init!
- */
+// We simply define a callback function that Raco will execute every 5s.
+// This actively pushes our value back into vm_swappiness, fighting vendor init!
 static void apply_swappiness_cb(void)
 {
 	vm_swappiness = sparxie_swappiness_val;
@@ -43,10 +39,8 @@ static int __init sparxie_swap_init(void)
 
 static void __exit sparxie_swap_exit(void)
 {
-	/*
-	 * Unregister the callback from Raco so the Sniper thread does not
-	 * execute it after this module is freed.
-	 */
+	// Unregister the callback from Raco so the Sniper thread does not
+// execute it after this module is freed.
 	raco_unregister_rc_override(apply_swappiness_cb);
 
 	pr_info("sparxie: Swappiness tuner module detached.\n");

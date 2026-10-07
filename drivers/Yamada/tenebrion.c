@@ -19,12 +19,10 @@
 #define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
 #define BACKLIGHT_PATH      "/sys/class/leds/lcd-backlight/brightness"
 
-/*
- * cpuset paths that get restricted when screen is off.
- * top-app / foreground are intentionally left alone — the system
- * scheduler already won't run heavy foreground work while the
- * screen is off, and touching those sets causes jank on wake.
- */
+// cpuset paths that get restricted when screen is off.
+// top-app / foreground are intentionally left alone — the system
+// scheduler already won't run heavy foreground work while the
+// screen is off, and touching those sets causes jank on wake.
 #define CPUSET_SYSBG_PATH   "/dev/cpuset/system-background/cpus"
 
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
@@ -47,9 +45,7 @@ static struct freq_qos_request tenebrion_min_req[NR_CPUS];
 static struct freq_qos_request tenebrion_max_req[NR_CPUS];
 static bool qos_initialized[NR_CPUS];
 
-/* ------------------------------------------------------------------ */
-/* File helpers                                                         */
-/* ------------------------------------------------------------------ */
+// File helpers
 
 static int tenebrion_read_file(const char *path, char *buf, size_t size)
 {
@@ -95,10 +91,8 @@ static int tenebrion_write_file(const char *path, const char *buf)
     return ret > 0 ? 0 : -1;
 }
 
-/* ------------------------------------------------------------------ */
-/* Path auto-detection                                                  */
-/* Tries both known paths once; if neither works, marks UNSUPPORTED.  */
-/* ------------------------------------------------------------------ */
+// Path auto-detection                                                  
+// Tries both known paths once; if neither works, marks UNSUPPORTED.
 
 static enum tenebrion_path tenebrion_detect_path(void)
 {
@@ -118,11 +112,8 @@ static enum tenebrion_path tenebrion_detect_path(void)
     return PATH_UNSUPPORTED;
 }
 
-/* ------------------------------------------------------------------ */
-/* Screen state detection                                               */
-/* Returns: 1 = on, 0 = off, -1 = unknown                             */
-/* ------------------------------------------------------------------ */
-
+// Screen state detection
+// Returns: 1 = on, 0 = off, -1 = unknown
 static int tenebrion_get_screen_state(void)
 {
     char buf[64];
@@ -152,17 +143,13 @@ static int tenebrion_get_screen_state(void)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* cpuset helpers                                                       */
-/* ------------------------------------------------------------------ */
+// cpuset helpers
 
-/*
- * Build a cpumask string that covers only CPU 0 — the safest single
- * core to leave for background work regardless of topology.
- * On screen-off we pin background and system-background cpusets to
- * CPU0 only; everything else stays as-is so foreground/top-app are
- * not affected.
- */
+// Build a cpumask string that covers only CPU 0 — the safest single
+// core to leave for background work regardless of topology.
+// On screen-off we pin background and system-background cpusets to
+// CPU0 only; everything else stays as-is so foreground/top-app are
+// not affected.
 #define CPUSET_SCREEN_OFF   "0\n"
 
 static char saved_sysbg_cpus[32] = "";
@@ -191,9 +178,7 @@ static void tenebrion_cpuset_restore(void)
     tenebrion_write_file(CPUSET_SYSBG_PATH, sysbg_buf);
 }
 
-/* ------------------------------------------------------------------ */
-/* QoS init — add requests for all online policy CPUs                  */
-/* ------------------------------------------------------------------ */
+// QoS init — add requests for all online policy CPUs
 
 static void tenebrion_qos_init(void)
 {
@@ -229,9 +214,7 @@ static void tenebrion_qos_init(void)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* CPUFreq — drop to min via QoS                                       */
-/* ------------------------------------------------------------------ */
+// CPUFreq — drop to min via QoS
 
 static void tenebrion_set_min_freq(void)
 {
@@ -244,11 +227,9 @@ static void tenebrion_set_min_freq(void)
             continue;
 
         if (policy->cpu == cpu && qos_initialized[cpu]) {
-            /*
-             * Order matters: bring min_req DOWN first so the QoS
-             * arbiter never sees min > max during the transition,
-             * then clamp max_req down to min_freq.
-             */
+            // Order matters: bring min_req DOWN first so the QoS
+// arbiter never sees min > max during the transition,
+// then clamp max_req down to min_freq.
             freq_qos_update_request(&tenebrion_min_req[cpu],
                                     policy->cpuinfo.min_freq);
             freq_qos_update_request(&tenebrion_max_req[cpu],
@@ -258,9 +239,7 @@ static void tenebrion_set_min_freq(void)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* CPUFreq — restore via QoS                                           */
-/* ------------------------------------------------------------------ */
+// CPUFreq — restore via QoS
 
 static void tenebrion_restore_freq(void)
 {
@@ -273,11 +252,9 @@ static void tenebrion_restore_freq(void)
             continue;
 
         if (policy->cpu == cpu && qos_initialized[cpu]) {
-            /*
-             * Order matters: raise the max_req ceiling first, then
-             * restore min_req floor.  Reversing this would momentarily
-             * set min > max on the QoS arbiter.
-             */
+            // Order matters: raise the max_req ceiling first, then
+// restore min_req floor.  Reversing this would momentarily
+// set min > max on the QoS arbiter.
             freq_qos_update_request(&tenebrion_max_req[cpu],
                                     policy->cpuinfo.max_freq);
             freq_qos_update_request(&tenebrion_min_req[cpu],
@@ -287,9 +264,7 @@ static void tenebrion_restore_freq(void)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* QoS cleanup                                                          */
-/* ------------------------------------------------------------------ */
+// QoS cleanup
 
 static void tenebrion_qos_cleanup(void)
 {
@@ -304,10 +279,8 @@ static void tenebrion_qos_cleanup(void)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* Screen-off / screen-on actions                                       */
-/* Both cpuset restriction and freq throttle happen together.          */
-/* ------------------------------------------------------------------ */
+// Screen-off / screen-on actions                                       
+// Both cpuset restriction and freq throttle happen together.
 
 static void tenebrion_on_screen_off(void)
 {
@@ -325,9 +298,7 @@ static void tenebrion_on_screen_on(void)
     is_screen_off = false;
 }
 
-/* ------------------------------------------------------------------ */
-/* FB Notifier                                                          */
-/* ------------------------------------------------------------------ */
+// FB Notifier
 
 #include <linux/fb.h>
 
@@ -370,9 +341,7 @@ static void tenebrion_init_worker(struct work_struct *work)
     pr_info("tenebrion: fb_notifier registered. Screen state hooks active.\n");
 }
 
-/* ------------------------------------------------------------------ */
-/* Init / Exit                                                          */
-/* ------------------------------------------------------------------ */
+// Init / Exit
 
 static int __init tenebrion_init(void)
 {

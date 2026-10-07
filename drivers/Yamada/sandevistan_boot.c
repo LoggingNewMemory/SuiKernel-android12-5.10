@@ -42,11 +42,7 @@ static void do_boost(struct work_struct *work)
 
         if (policy->cpu == cpu) {
             if (!qos_initialized[cpu]) {
-                /*
-                 * Add max_req first (sets ceiling), then min_req
-                 * (raises floor to meet it).  This avoids a transient
-                 * min > max state in the QoS arbiter.
-                 */
+                // Add max_req first (sets ceiling), then min_req (raises floor to meet it). This avoids a transient min > max state in the QoS arbiter.
                 freq_qos_add_request(&policy->constraints,
                                      &sandevistan_max_req[cpu],
                                      FREQ_QOS_MAX,
@@ -89,11 +85,7 @@ static void do_revert(struct work_struct *work)
             continue;
 
         if (policy->cpu == cpu && qos_initialized[cpu]) {
-            /*
-             * Lower min_req floor first so it can never exceed the
-             * max_req value during the transition, then release the
-             * max_req ceiling lock back to hardware max.
-             */
+            // Lower min_req floor first so it can never exceed the max_req value during the transition, then release the max_req ceiling lock back to hardware max.
             freq_qos_update_request(&sandevistan_min_req[cpu],
                                     policy->cpuinfo.min_freq);
             freq_qos_update_request(&sandevistan_max_req[cpu],

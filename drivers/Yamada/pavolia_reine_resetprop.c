@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/*
- * drivers/misc/pavolia_reine_resetprop.c
- * Pavolia Reine Setprop Engine - Inject Android properties from kernel
- * Author: Kanagawa Yamada
- */
+// drivers/misc/pavolia_reine_resetprop.c
+// Pavolia Reine Setprop Engine - Inject Android properties from kernel
+// Author: Kanagawa Yamada
 
 #include <linux/module.h>
 #include <linux/kernel.h>
