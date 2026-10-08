@@ -1,11 +1,11 @@
 menu "Yamada Custom Android Drivers"
 
-config OCHINAI_INAHO_AUDIO
-	tristate "Ochinai Inaho Audio — SCHED_FIFO + PM QoS + CPUSet tuning"
+config OCHINAI_INAHO
+	tristate "Ochinai Inaho — SCHED_FIFO + PM QoS tuning"
 	depends on CPU_FREQ && SCHED_DEBUG
 	help
 	  Boosts audio threads to SCHED_FIFO priority, locks CPU latency
-	  via PM QoS, and expands CPUSet for audio processes to include
+	  via PM QoS.
 
 config SPARXIE_SWAP_TUNER
 	tristate "Tune the swappiness value"
