@@ -62,7 +62,7 @@ static int anya_read_file(const char *path, char *buf, size_t size)
 
 // Disable all thermal zones
 
-static void anya_disable_all_zones(void)
+void anya_disable_all_zones(void)
 {
     char path[128];
     char buf[32];
@@ -96,6 +96,45 @@ static void anya_disable_all_zones(void)
     pr_info("anya_disable_thermal: %d thermal zones disabled\n",
             disabled_count);
 }
+EXPORT_SYMBOL(anya_disable_all_zones);
+
+void anya_enable_all_zones(void)
+{
+    char path[128];
+    char buf[32];
+    int i, ret;
+    int enabled_count = 0;
+
+    for (i = 0; i < THERMAL_ZONE_MAX; i++) {
+        snprintf(path, sizeof(path), "%s%d/mode", THERMAL_BASE, i);
+
+        /* Check if zone exists */
+        ret = anya_read_file(path, buf, sizeof(buf));
+        if (ret < 0)
+            break;
+
+        /* Skip if already enabled */
+        if (strstr(buf, "enabled")) {
+            enabled_count++;
+            continue;
+        }
+
+        /* Write enabled */
+        ret = anya_write_file(path, "enabled");
+        if (ret < 0) {
+            pr_warn("anya_disable_thermal: zone%d enable failed (%d)\n", i, ret);
+            continue;
+        }
+
+        enabled_count++;
+    }
+
+    pr_info("anya_disable_thermal: %d thermal zones enabled\n",
+            enabled_count);
+}
+EXPORT_SYMBOL(anya_enable_all_zones);
+
+
 
 static struct delayed_work anya_thermal_work;
 
