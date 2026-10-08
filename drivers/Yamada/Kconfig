@@ -26,7 +26,7 @@ config PAVOLIA_REINE_RESETPROP
 	default y
 	help
 	  Please see the required Patches for this (See Bulder/PavoliaReinePatch.sh)
-	  And please see include/linux/pavolia_reine_resetprop.h
+	  And please see include/linux/pavolia_reine_setprop.h
 
 config SANDEVISTAN_BOOT
 	tristate "Sandevistan Boot — temporary performance governor boost"
