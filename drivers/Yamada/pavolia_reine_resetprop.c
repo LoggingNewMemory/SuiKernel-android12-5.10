@@ -55,9 +55,15 @@ static void execute_resetprop_work(struct work_struct *work)
 	mutex_lock(&prop_lock);
 	list_for_each_entry_safe(entry, tmp, &prop_list, list) {
 		char *argv[] = { "/data/adb/ksud", "resetprop", entry->prop, entry->val, NULL };
+		char *envp[] = {
+			"HOME=/",
+			"TERM=linux",
+			"PATH=/sbin:/system/sbin:/system/bin:/system/xbin:/data/adb",
+			NULL
+		};
 		int ret;
 
-		ret = call_usermodehelper(argv[0], argv, NULL, UMH_WAIT_EXEC);
+		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 		
 		if (ret == 0) {
 			pr_info("pavolia_reine: Successfully executed -> ksud resetprop %s %s\n", entry->prop, entry->val);
