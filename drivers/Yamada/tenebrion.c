@@ -21,7 +21,8 @@
 // screen is off, and touching those sets causes jank on wake.
 #define CPUSET_SYSBG_PATH   "/dev/cpuset/system-background/cpus"
 #define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
-#define BACKLIGHT_PATH      "/sys/class/leds/lcd-backlight/brightness"
+#define BACKLIGHT_PATH_1    "/sys/class/leds/lcd-backlight/brightness"
+#define BACKLIGHT_PATH_2    "/sys/class/backlight/panel0-backlight/brightness"
 
 #define POLL_INTERVAL_ON_MS  3000 // Slow poll when screen is ON
 #define POLL_INTERVAL_OFF_MS 100  // Hair-trigger poll when screen is OFF
@@ -242,22 +243,27 @@ static void tenebrion_on_screen_on(void)
 
 static struct delayed_work tenebrion_poll_work;
 
+static const char *active_backlight_path = NULL;
+
 static void tenebrion_poll_worker(struct work_struct *work)
 {
 	char buf[16] = {0};
 	bool currently_off = false;
 
-	// Check backlight brightness. "0" means screen off.
-	if (tenebrion_read_file(BACKLIGHT_PATH, buf, sizeof(buf)) == 0) {
+	// 1. Primary check: Backlight brightness. "0" means screen off.
+	if (active_backlight_path && tenebrion_read_file(active_backlight_path, buf, sizeof(buf)) > 0) {
 		if (buf[0] == '0' && buf[1] == '\0') {
 			currently_off = true;
 		}
-	} else if (tenebrion_read_file(DPMS_PATH, buf, sizeof(buf)) == 0) {
-		// Fallback to DPMS if backlight is inaccessible
+	}
+
+	// 2. Secondary check: DPMS state. "Off" means screen off.
+	if (tenebrion_read_file(DPMS_PATH, buf, sizeof(buf)) > 0) {
 		if (strncmp(buf, "Off", 3) == 0) {
 			currently_off = true;
 		}
 	}
+
 	mutex_lock(&tenebrion_lock);
 	if (currently_off && !is_screen_off) {
 		tenebrion_on_screen_off();
@@ -279,12 +285,36 @@ static struct delayed_work tenebrion_init_work;
 
 static void tenebrion_init_worker(struct work_struct *work)
 {
-    pr_info("tenebrion: late init started\n");
-    tenebrion_qos_init();
-    
-    INIT_DELAYED_WORK(&tenebrion_poll_work, tenebrion_poll_worker);
-    schedule_delayed_work(&tenebrion_poll_work, msecs_to_jiffies(1000));
-    pr_info("tenebrion: VFS polling registered. Screen state hooks active.\n");
+	struct file *f;
+	int i;
+	const char *backlight_paths[] = {
+		BACKLIGHT_PATH_1,
+		BACKLIGHT_PATH_2,
+		NULL
+	};
+
+	pr_info("tenebrion: late init started\n");
+
+	// Hardware detection: Find which backlight path exists
+	for (i = 0; backlight_paths[i] != NULL; i++) {
+		f = filp_open(backlight_paths[i], O_RDONLY, 0);
+		if (!IS_ERR(f)) {
+			filp_close(f, NULL);
+			active_backlight_path = backlight_paths[i];
+			break;
+		}
+	}
+
+	if (!active_backlight_path) {
+		pr_err("tenebrion: No valid BACKLIGHT path found! Aborting module execution.\n");
+		return;
+	}
+
+	tenebrion_qos_init();
+	
+	INIT_DELAYED_WORK(&tenebrion_poll_work, tenebrion_poll_worker);
+	schedule_delayed_work(&tenebrion_poll_work, msecs_to_jiffies(1000));
+	pr_info("tenebrion: VFS polling registered. Screen state hooks active.\n");
 }
 
 // Init / Exit
