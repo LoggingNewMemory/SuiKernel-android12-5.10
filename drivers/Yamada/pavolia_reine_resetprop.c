@@ -25,7 +25,8 @@ struct prop_entry {
 
 static LIST_HEAD(prop_list);
 static DEFINE_MUTEX(prop_lock);
-static struct delayed_work prop_work;
+static void execute_resetprop_work(struct work_struct *work);
+static DECLARE_DELAYED_WORK(prop_work, execute_resetprop_work);
 static int retry_count = 0;
 
 static void execute_resetprop_work(struct work_struct *work)
@@ -112,8 +113,6 @@ EXPORT_SYMBOL_GPL(pavolia_reine_resetprop);
 
 static int __init pavolia_reine_init(void)
 {
-	INIT_DELAYED_WORK(&prop_work, execute_resetprop_work);
-	
 	// Start the dynamic VFS polling loop 10 seconds after boot
 	schedule_delayed_work(&prop_work, msecs_to_jiffies(10000));
 
