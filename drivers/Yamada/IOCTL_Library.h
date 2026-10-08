@@ -4,8 +4,6 @@
 #include <linux/types.h>
 
 /* Global variables for SuiKernel Manager IOCTL */
-extern void anya_disable_all_zones(void);
-extern void anya_enable_all_zones(void);
 extern bool anya_thermal_enabled;
 extern bool yamada_touch_boost_enabled;
 extern int  yamada_touch_boost_duration;

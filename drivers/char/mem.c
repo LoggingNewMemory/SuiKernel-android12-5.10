@@ -932,16 +932,14 @@ static const struct file_operations __maybe_unused kmem_fops = {
 };
 
 
+bool anya_thermal_enabled = true;
+EXPORT_SYMBOL(anya_thermal_enabled);
+
 static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;
-		if (anya_thermal_enabled) {
-			anya_disable_all_zones();
-		} else {
-			anya_enable_all_zones();
-		}
 		pr_info("SuiKernel IOCTL: Anya Thermal set to %s\n", anya_thermal_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_DISABLE:
