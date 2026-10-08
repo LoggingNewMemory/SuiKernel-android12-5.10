@@ -5,6 +5,7 @@
 
 /* Global variables for SuiKernel Manager IOCTL */
 extern bool anya_thermal_enabled;
+extern void yamada_touch_boost_off(void);
 extern bool yamada_touch_boost_enabled;
 extern int  yamada_touch_boost_duration;
 extern bool inaho_enabled;

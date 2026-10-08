@@ -944,6 +944,7 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_DISABLE:
 		yamada_touch_boost_enabled = false;
+		yamada_touch_boost_off();
 		pr_info("SuiKernel IOCTL: Yamada Touch Boost set to Disabled\n");
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_BALANCED:

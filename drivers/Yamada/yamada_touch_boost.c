@@ -38,6 +38,13 @@ static void do_boost_off(struct work_struct *work) {
 
 }
 
+void yamada_touch_boost_off(void) {
+	cancel_delayed_work_sync(&boost_off_work);
+	do_boost_off(NULL);
+}
+EXPORT_SYMBOL(yamada_touch_boost_off);
+
+
 static void kobo_trigger_boost(void) {
 	unsigned long flags;
 
