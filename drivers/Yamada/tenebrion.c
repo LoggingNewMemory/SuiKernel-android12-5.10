@@ -20,6 +20,11 @@
 // scheduler already won't run heavy foreground work while the
 // screen is off, and touching those sets causes jank on wake.
 #define CPUSET_SYSBG_PATH   "/dev/cpuset/system-background/cpus"
+#define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
+#define BACKLIGHT_PATH      "/sys/class/leds/lcd-backlight/brightness"
+
+#define POLL_INTERVAL_ON_MS  3000 // Slow poll when screen is ON
+#define POLL_INTERVAL_OFF_MS 100  // Hair-trigger poll when screen is OFF
 
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
@@ -233,36 +238,42 @@ static void tenebrion_on_screen_on(void)
     is_screen_off = false;
 }
 
-// FB Notifier
+// Screen State Polling
 
-static int tenebrion_fb_notifier_callback(struct notifier_block *self,
-					 unsigned long event, void *data)
+static struct delayed_work tenebrion_poll_work;
+
+static void tenebrion_poll_worker(struct work_struct *work)
 {
-	struct fb_event *evdata = data;
-	int *blank;
+	char buf[16] = {0};
+	bool currently_off = false;
 
-	if (event != FB_EVENT_BLANK)
-		return 0;
-
-	blank = evdata->data;
-
-	mutex_lock(&tenebrion_lock);
-
-	if (*blank == FB_BLANK_UNBLANK) {
-		if (is_screen_off)
-			tenebrion_on_screen_on();
-	} else if (*blank == FB_BLANK_POWERDOWN) {
-		if (!is_screen_off && tenebrion_enabled)
-			tenebrion_on_screen_off();
+	// Check backlight brightness. "0" means screen off.
+	if (tenebrion_read_file(BACKLIGHT_PATH, buf, sizeof(buf)) == 0) {
+		if (buf[0] == '0' && buf[1] == '\0') {
+			currently_off = true;
+		}
+	} else if (tenebrion_read_file(DPMS_PATH, buf, sizeof(buf)) == 0) {
+		// Fallback to DPMS if backlight is inaccessible
+		if (strncmp(buf, "Off", 3) == 0) {
+			currently_off = true;
+		}
 	}
-
+	mutex_lock(&tenebrion_lock);
+	if (currently_off && !is_screen_off) {
+		tenebrion_on_screen_off();
+	} else if (!currently_off && is_screen_off) {
+		tenebrion_on_screen_on();
+	}
 	mutex_unlock(&tenebrion_lock);
-	return 0;
-}
 
-static struct notifier_block tenebrion_fb_notif = {
-	.notifier_call = tenebrion_fb_notifier_callback,
-};
+	// Asymmetric Polling: If screen is off, check every 100ms for instant wake-up.
+	// If screen is on, check every 3000ms because throttling delay on sleep doesn't matter.
+	if (currently_off) {
+		schedule_delayed_work(&tenebrion_poll_work, msecs_to_jiffies(POLL_INTERVAL_OFF_MS));
+	} else {
+		schedule_delayed_work(&tenebrion_poll_work, msecs_to_jiffies(POLL_INTERVAL_ON_MS));
+	}
+}
 
 static struct delayed_work tenebrion_init_work;
 
@@ -270,8 +281,10 @@ static void tenebrion_init_worker(struct work_struct *work)
 {
     pr_info("tenebrion: late init started\n");
     tenebrion_qos_init();
-    fb_register_client(&tenebrion_fb_notif);
-    pr_info("tenebrion: fb_notifier registered. Screen state hooks active.\n");
+    
+    INIT_DELAYED_WORK(&tenebrion_poll_work, tenebrion_poll_worker);
+    schedule_delayed_work(&tenebrion_poll_work, msecs_to_jiffies(1000));
+    pr_info("tenebrion: VFS polling registered. Screen state hooks active.\n");
 }
 
 // Init / Exit
@@ -283,14 +296,14 @@ static int __init tenebrion_init(void)
     INIT_DELAYED_WORK(&tenebrion_init_work, tenebrion_init_worker);
     schedule_delayed_work(&tenebrion_init_work, msecs_to_jiffies(40000));
 
-    pr_info("tenebrion: active — using fb_notifier\n");
+    pr_info("tenebrion: active — using VFS polling\n");
     return 0;
 }
 
 static void __exit tenebrion_exit(void)
 {
     cancel_delayed_work_sync(&tenebrion_init_work);
-    fb_unregister_client(&tenebrion_fb_notif);
+    cancel_delayed_work_sync(&tenebrion_poll_work);
 
     if (is_screen_off) {
         mutex_lock(&tenebrion_lock);
