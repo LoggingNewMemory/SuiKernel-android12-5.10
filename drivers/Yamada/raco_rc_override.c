@@ -23,7 +23,8 @@ struct raco_target {
 
 static LIST_HEAD(raco_target_list);
 static DEFINE_MUTEX(raco_list_lock);
-static struct delayed_work raco_work;
+static void raco_sniper_work(struct work_struct *work);
+static DECLARE_DELAYED_WORK(raco_work, raco_sniper_work);
 
 static void raco_sniper_work(struct work_struct *work)
 {
@@ -122,8 +123,6 @@ static int __init raco_override_init(void)
 	
 	// Set expiration to exactly 120 seconds after this module initializes
 	raco_expiry_jiffies = jiffies + msecs_to_jiffies(120000);
-
-	INIT_DELAYED_WORK(&raco_work, raco_sniper_work);
 	
 	ret = register_kprobe(&raco_kprobe);
 	if (ret < 0) {
