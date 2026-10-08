@@ -1,6 +1,6 @@
 // tenebrion.c
 // SPDX-License-Identifier: GPL-3.0-only
-// Tenebrion — Screen state based CPU frequency throttler + cpuset limiter
+// Tenebrion — Screen state based CPU frequency throttler
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
@@ -14,12 +14,6 @@
 #include <linux/cpumask.h>
 #include <linux/fb.h>
 
-
-// cpuset paths that get restricted when screen is off.
-// top-app / foreground are intentionally left alone — the system
-// scheduler already won't run heavy foreground work while the
-// screen is off, and touching those sets causes jank on wake.
-#define CPUSET_SYSBG_PATH   "/dev/cpuset/system-background/cpus"
 #define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
 #define BACKLIGHT_PATH_1    "/sys/class/leds/lcd-backlight/brightness"
 #define BACKLIGHT_PATH_2    "/sys/class/backlight/panel0-backlight/brightness"
@@ -64,59 +58,6 @@ static int tenebrion_read_file(const char *path, char *buf, size_t size)
     }
 
     return ret;
-}
-
-static int tenebrion_write_file(const char *path, const char *buf)
-{
-    struct file *f;
-    loff_t pos = 0;
-    int ret;
-
-    f = filp_open(path, O_WRONLY, 0);
-    if (IS_ERR(f)) {
-        pr_warn("tenebrion: cannot open %s for write\n", path);
-        return -1;
-    }
-
-    ret = kernel_write(f, buf, strlen(buf), &pos);
-    filp_close(f, NULL);
-
-    return ret > 0 ? 0 : -1;
-}
-
-// cpuset helpers
-
-// Build a cpumask string that covers only CPU 0 — the safest single
-// core to leave for background work regardless of topology.
-// On screen-off we pin background and system-background cpusets to
-// CPU0 only; everything else stays as-is so foreground/top-app are
-// not affected.
-#define CPUSET_SCREEN_OFF   "0\n"
-
-static char saved_sysbg_cpus[32] = "";
-
-static void tenebrion_cpuset_restrict(void)
-{
-    /* Save current mask before overriding */
-    tenebrion_read_file(CPUSET_SYSBG_PATH, saved_sysbg_cpus, sizeof(saved_sysbg_cpus));
-
-    tenebrion_write_file(CPUSET_SYSBG_PATH, CPUSET_SCREEN_OFF);
-}
-
-static void tenebrion_cpuset_restore(void)
-{
-    char sysbg_buf[32];
-    char fallback_mask[32];
-    int total_cores = num_possible_cpus();
-
-    /* Forge the dynamic mask just in case the read failed (e.g. "0-7", "0-3") */
-    snprintf(fallback_mask, sizeof(fallback_mask), "0-%d", total_cores - 1);
-
-    /* tenebrion_read_file stripped the newline, so we must add it back */
-    snprintf(sysbg_buf, sizeof(sysbg_buf), "%s\n", 
-             saved_sysbg_cpus[0] ? saved_sysbg_cpus : fallback_mask);
-
-    tenebrion_write_file(CPUSET_SYSBG_PATH, sysbg_buf);
 }
 
 // QoS init — add requests for all online policy CPUs
@@ -220,22 +161,19 @@ static void tenebrion_qos_cleanup(void)
     }
 }
 
-// Screen-off / screen-on actions                                       
-// Both cpuset restriction and freq throttle happen together.
+// Screen-off / screen-on actions
 
 static void tenebrion_on_screen_off(void)
 {
     if (!tenebrion_enabled) return;
 
     tenebrion_set_min_freq();
-    tenebrion_cpuset_restrict();
     is_screen_off = true;
 }
 
 static void tenebrion_on_screen_on(void)
 {
     tenebrion_restore_freq();
-    tenebrion_cpuset_restore();
     is_screen_off = false;
 }
 
@@ -351,4 +289,4 @@ module_exit(tenebrion_exit);
 
 MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kanagawa Yamada");
-MODULE_DESCRIPTION("Tenebrion: Screen state based CPU frequency throttler + cpuset limiter");
+MODULE_DESCRIPTION("Tenebrion: Screen state based CPU frequency throttler");
