@@ -11,6 +11,7 @@ extern int  yamada_touch_boost_duration;
 extern bool inaho_enabled;
 extern bool tenebrion_enabled;
 extern int  sparxie_swappiness_val;
+extern void sparxie_set_swappiness(int val);
 extern bool airani_enabled;
 extern bool sandevistan_enabled;
 

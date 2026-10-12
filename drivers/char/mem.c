@@ -966,8 +966,7 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		pr_info("SuiKernel IOCTL: Tenebrion set to %s\n", tenebrion_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_SPARXIE_SWAP:
-		sparxie_swappiness_val = (int)arg;
-		pr_info("SuiKernel IOCTL: Sparxie Swappiness set to %d\n", sparxie_swappiness_val);
+		sparxie_set_swappiness((int)arg);
 		return 0;
 	case CMD_AIRANI_CPUSET:
 		airani_enabled = (bool)arg;

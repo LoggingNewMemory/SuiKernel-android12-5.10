@@ -21,6 +21,13 @@ static void apply_swappiness_cb(void)
 	vm_swappiness = sparxie_swappiness_val;
 }
 
+void sparxie_set_swappiness(int val)
+{
+	sparxie_swappiness_val = val;
+	vm_swappiness = val;
+}
+EXPORT_SYMBOL(sparxie_set_swappiness);
+
 static int __init sparxie_swap_init(void)
 {
 	/* 1. Apply immediately at boot */
