@@ -23,8 +23,6 @@
 #include <linux/pid.h>
 #include <uapi/linux/sched/types.h>
 
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
-
 #define ENGAGE_DELAY_MS     20000
 #define AUDIO_SCAN_MS        5000
 #define PM_QOS_LATENCY_US     100

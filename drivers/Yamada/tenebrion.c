@@ -12,7 +12,6 @@
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
-#include <linux/fb.h>
 
 #define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
 #define BACKLIGHT_PATH_1    "/sys/class/leds/lcd-backlight/brightness"
@@ -20,8 +19,6 @@
 
 #define POLL_INTERVAL_ON_MS  3000 // Slow poll when screen is ON
 #define POLL_INTERVAL_OFF_MS 100  // Hair-trigger poll when screen is OFF
-
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 bool tenebrion_enabled = true;
 static bool is_screen_off = false;

@@ -11,8 +11,6 @@
 #include <linux/input.h>
 #include <linux/fs.h>
 
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
-
 #define BOOST_DURATION_MS   100
 
 bool yamada_touch_boost_enabled = true;
