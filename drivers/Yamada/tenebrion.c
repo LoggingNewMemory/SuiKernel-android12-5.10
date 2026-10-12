@@ -172,14 +172,14 @@ static void tenebrion_poll_worker(struct work_struct *work)
 	bool currently_off = false;
 
 	// 1. Primary check: Backlight brightness. "0" means screen off.
-	if (active_backlight_path && tenebrion_read_file(active_backlight_path, buf, sizeof(buf)) > 0) {
+	if (active_backlight_path && sui_read_raw_file(active_backlight_path, buf, sizeof(buf)) > 0) {
 		if (buf[0] == '0' && buf[1] == '\0') {
 			currently_off = true;
 		}
 	}
 
 	// 2. Secondary check: DPMS state. "Off" means screen off.
-	if (tenebrion_read_file(DPMS_PATH, buf, sizeof(buf)) > 0) {
+	if (sui_read_raw_file(DPMS_PATH, buf, sizeof(buf)) > 0) {
 		if (strncmp(buf, "Off", 3) == 0) {
 			currently_off = true;
 		}

@@ -57,19 +57,17 @@ static inline bool sui_manager_is_installed(void)
 }
 
 /**
- * sui_read_config - Read a config file from /data/SuiKernel/<feature>
+ * sui_read_raw_file - Read any file into a buffer and strip trailing newline
  */
-static inline int sui_read_config(const char *feature, char *buf, size_t size)
+static inline int sui_read_raw_file(const char *path, char *buf, size_t size)
 {
 	struct file *f;
-	char path[64];
 	loff_t pos = 0;
 	int ret;
 
-	if (!feature || !buf || size == 0)
+	if (!path || !buf || size == 0)
 		return -1;
 
-	snprintf(path, sizeof(path), "/data/SuiKernel/%s", feature);
 	f = filp_open(path, O_RDONLY, 0);
 	if (IS_ERR(f))
 		return -1;
@@ -87,6 +85,20 @@ static inline int sui_read_config(const char *feature, char *buf, size_t size)
 	}
 
 	return ret;
+}
+
+/**
+ * sui_read_config - Read a config file from /data/SuiKernel/<feature>
+ */
+static inline int sui_read_config(const char *feature, char *buf, size_t size)
+{
+	char path[64];
+
+	if (!feature)
+		return -1;
+
+	snprintf(path, sizeof(path), "/data/SuiKernel/%s", feature);
+	return sui_read_raw_file(path, buf, size);
 }
 
 /**
