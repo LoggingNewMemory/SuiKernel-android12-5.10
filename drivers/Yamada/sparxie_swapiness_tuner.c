@@ -8,16 +8,53 @@
 #include <linux/atomic.h>
 #include <linux/workqueue.h>
 #include <linux/mm.h>
+#include <linux/fs.h>
 #include <linux/raco_override.h>
+
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 int sparxie_swappiness_val = 30;
 
 extern int vm_swappiness;
 
+static int sparxie_read_file(const char *path, char *buf, size_t size)
+{
+	struct file *f;
+	loff_t pos = 0;
+	int ret;
+
+	f = filp_open(path, O_RDONLY, 0);
+	if (IS_ERR(f))
+		return -1;
+
+	ret = kernel_read(f, buf, size - 1, &pos);
+	filp_close(f, NULL);
+
+	if (ret > 0) {
+		if (buf[ret - 1] == '\n')
+			buf[ret - 1] = '\0';
+		else
+			buf[ret] = '\0';
+	} else {
+		ret = -1;
+	}
+
+	return ret;
+}
+
 // We simply define a callback function that Raco will execute every 5s.
 // This actively pushes our value back into vm_swappiness, fighting vendor init!
 static void apply_swappiness_cb(void)
 {
+	char cfg[16];
+	int val = 0;
+
+	if (sparxie_read_file("/data/SuiKernel/swappiness", cfg, sizeof(cfg)) > 0) {
+		if (kstrtoint(cfg, 10, &val) == 0 && val >= 10 && val <= 100) {
+			sparxie_swappiness_val = val;
+		}
+	}
+
 	vm_swappiness = sparxie_swappiness_val;
 }
 

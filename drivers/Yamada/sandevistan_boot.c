@@ -8,6 +8,9 @@
 #include <linux/workqueue.h>
 #include <linux/cpu.h>
 #include <linux/pm_qos.h>
+#include <linux/fs.h>
+
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 #define BOOST_DELAY_MS   10000
 #define REVERT_DELAY_MS  10000
@@ -22,15 +25,52 @@ static struct freq_qos_request sandevistan_min_req[NR_CPUS];
 static struct freq_qos_request sandevistan_max_req[NR_CPUS];
 static bool qos_initialized[NR_CPUS];
 
+static int sandevistan_read_file(const char *path, char *buf, size_t size)
+{
+	struct file *f;
+	loff_t pos = 0;
+	int ret;
+
+	f = filp_open(path, O_RDONLY, 0);
+	if (IS_ERR(f))
+		return -1;
+
+	ret = kernel_read(f, buf, size - 1, &pos);
+	filp_close(f, NULL);
+
+	if (ret > 0) {
+		if (buf[ret - 1] == '\n')
+			buf[ret - 1] = '\0';
+		else
+			buf[ret] = '\0';
+	} else {
+		ret = -1;
+	}
+
+	return ret;
+}
+
 static void do_boost(struct work_struct *work)
 {
-    unsigned int cpu;
-    struct cpufreq_policy *policy;
+	unsigned int cpu;
+	struct cpufreq_policy *policy;
+	char cfg[16];
 
-    if (!sandevistan_enabled) {
-        pr_info("sandevistan_boot: aborted by Manager IOCTL\n");
-        return;
-    }
+	/* Check persistent flag from Manager if available */
+	if (sandevistan_read_file("/data/SuiKernel/sandevistan", cfg, sizeof(cfg)) > 0) {
+		if (cfg[0] == '0') {
+			sandevistan_enabled = false;
+			pr_info("sandevistan_boot: disabled via /data/SuiKernel/sandevistan\n");
+			return;
+		} else if (cfg[0] == '1') {
+			sandevistan_enabled = true;
+		}
+	}
+
+	if (!sandevistan_enabled) {
+		pr_info("sandevistan_boot: aborted by Manager IOCTL\n");
+		return;
+	}
 
     pr_info("sandevistan_boot: jacking in — locking min=max via QoS\n");
 
