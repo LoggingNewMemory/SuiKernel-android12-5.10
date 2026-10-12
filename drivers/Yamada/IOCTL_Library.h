@@ -6,10 +6,13 @@
 /* Global variables for SuiKernel Manager IOCTL */
 extern bool anya_thermal_enabled;
 extern void yamada_touch_boost_off(void);
+extern void yamada_touch_boost_set_mode(int mode);
 extern bool yamada_touch_boost_enabled;
 extern int  yamada_touch_boost_duration;
 extern bool inaho_enabled;
+extern void inaho_set_enabled(bool enabled);
 extern bool tenebrion_enabled;
+extern void tenebrion_set_enabled(bool enabled);
 extern int  sparxie_swappiness_val;
 extern void sparxie_set_swappiness(int val);
 extern bool airani_enabled;

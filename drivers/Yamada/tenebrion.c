@@ -177,6 +177,17 @@ static void tenebrion_on_screen_on(void)
     is_screen_off = false;
 }
 
+void tenebrion_set_enabled(bool enabled)
+{
+    mutex_lock(&tenebrion_lock);
+    tenebrion_enabled = enabled;
+    if (!enabled && is_screen_off) {
+        tenebrion_on_screen_on();
+    }
+    mutex_unlock(&tenebrion_lock);
+}
+EXPORT_SYMBOL(tenebrion_set_enabled);
+
 // Screen State Polling
 
 static struct delayed_work tenebrion_poll_work;
@@ -223,6 +234,7 @@ static struct delayed_work tenebrion_init_work;
 
 static void tenebrion_init_worker(struct work_struct *work)
 {
+	char cfg[16];
 	struct file *f;
 	int i;
 	const char *backlight_paths[] = {
@@ -230,6 +242,21 @@ static void tenebrion_init_worker(struct work_struct *work)
 		BACKLIGHT_PATH_2,
 		NULL
 	};
+
+	if (tenebrion_read_file("/data/SuiKernel/tenebrion", cfg, sizeof(cfg)) > 0) {
+		if (cfg[0] == '0') {
+			tenebrion_set_enabled(false);
+			pr_info("tenebrion: disabled via /data/SuiKernel/tenebrion\n");
+			return;
+		} else if (cfg[0] == '1') {
+			tenebrion_set_enabled(true);
+		}
+	}
+
+	if (!tenebrion_enabled) {
+		pr_info("tenebrion: disabled, skipping init\n");
+		return;
+	}
 
 	pr_info("tenebrion: late init started\n");
 

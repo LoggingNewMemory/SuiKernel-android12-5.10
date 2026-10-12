@@ -15,12 +15,15 @@
 #include <linux/sched/rt.h>
 #include <linux/sched/signal.h>
 #include <linux/pm_qos.h>
+#include <linux/workqueue.h>
 #include <linux/cpu.h>
 #include <linux/rcupdate.h>
 #include <linux/string.h>
 #include <linux/atomic.h>
 #include <linux/pid.h>
 #include <uapi/linux/sched/types.h>
+
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 #define ENGAGE_DELAY_MS     20000
 #define AUDIO_SCAN_MS        5000
@@ -31,6 +34,68 @@ bool inaho_enabled = true;
 
 static struct pm_qos_request inaho_pm_qos;
 static bool pm_qos_active;
+
+static int inaho_read_file(const char *path, char *buf, size_t size)
+{
+	struct file *f;
+	loff_t pos = 0;
+	int ret;
+
+	f = filp_open(path, O_RDONLY, 0);
+	if (IS_ERR(f))
+		return -1;
+
+	ret = kernel_read(f, buf, size - 1, &pos);
+	filp_close(f, NULL);
+
+	if (ret > 0) {
+		if (buf[ret - 1] == '\n')
+			buf[ret - 1] = '\0';
+		else
+			buf[ret] = '\0';
+	} else {
+		ret = -1;
+	}
+
+	return ret;
+}
+
+static void inaho_pm_qos_engage(void)
+{
+	if (pm_qos_active)
+		return;
+
+	cpu_latency_qos_add_request(&inaho_pm_qos, PM_QOS_LATENCY_US);
+	pm_qos_active = true;
+}
+
+void inaho_set_enabled(bool enabled)
+{
+	inaho_enabled = enabled;
+	if (enabled) {
+		inaho_pm_qos_engage();
+	} else if (pm_qos_active) {
+		cpu_latency_qos_remove_request(&inaho_pm_qos);
+		pm_qos_active = false;
+	}
+}
+EXPORT_SYMBOL(inaho_set_enabled);
+
+static struct delayed_work inaho_init_work;
+
+static void inaho_init_worker(struct work_struct *work)
+{
+	char cfg[16];
+
+	if (inaho_read_file("/data/SuiKernel/inaho", cfg, sizeof(cfg)) > 0) {
+		if (cfg[0] == '0') {
+			inaho_set_enabled(false);
+			return;
+		} else if (cfg[0] == '1') {
+			inaho_set_enabled(true);
+		}
+	}
+}
 
 // Audio threads
 static const char * const audio_threads[] = {
@@ -109,15 +174,6 @@ static struct kprobe inaho_kprobe = {
 	.pre_handler = inaho_set_task_comm_pre,
 };
 
-static void inaho_pm_qos_engage(void)
-{
-	if (pm_qos_active)
-		return;
-
-	cpu_latency_qos_add_request(&inaho_pm_qos, PM_QOS_LATENCY_US);
-	pm_qos_active = true;
-}
-
 static int __init inaho_audio_enhance_init(void)
 {
 	int ret;
@@ -135,12 +191,16 @@ static int __init inaho_audio_enhance_init(void)
 		return ret;
 	}
 
+	INIT_DELAYED_WORK(&inaho_init_work, inaho_init_worker);
+	schedule_delayed_work(&inaho_init_work, msecs_to_jiffies(15000));
+
 	pr_info("inaho: active — kprobes hooked\n");
 	return 0;
 }
 
 static void __exit inaho_audio_enhance_exit(void)
 {
+	cancel_delayed_work_sync(&inaho_init_work);
 	unregister_kprobe(&inaho_kprobe);
 
 	if (pm_qos_active) {

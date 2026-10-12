@@ -11,7 +11,11 @@
 
 
 #include <linux/capability.h>
+#include <linux/fs.h>
+#include <linux/workqueue.h>
 #include "../Yamada/IOCTL_Library.h"
+
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -940,41 +944,30 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;
-		pr_info("SuiKernel IOCTL: Anya Thermal set to %s\n", anya_thermal_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_DISABLE:
-		yamada_touch_boost_enabled = false;
-		yamada_touch_boost_off();
-		pr_info("SuiKernel IOCTL: Yamada Touch Boost set to Disabled\n");
+		yamada_touch_boost_set_mode(0);
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_BALANCED:
-		yamada_touch_boost_enabled = true;
-		yamada_touch_boost_duration = 100;
-		pr_info("SuiKernel IOCTL: Yamada Touch Boost set to Balanced\n");
+		yamada_touch_boost_set_mode(1);
 		return 0;
 	case CMD_YAMADA_TOUCH_BOOST_GAMING:
-		yamada_touch_boost_enabled = true;
-		yamada_touch_boost_duration = 300;
-		pr_info("SuiKernel IOCTL: Yamada Touch Boost set to Gaming\n");
+		yamada_touch_boost_set_mode(2);
 		return 0;
 	case CMD_INAHO_AUDIO:
-		inaho_enabled = (bool)arg;
-		pr_info("SuiKernel IOCTL: Inaho Audio set to %s\n", inaho_enabled ? "Enabled" : "Disabled");
+		inaho_set_enabled((bool)arg);
 		return 0;
 	case CMD_TENEBRION:
-		tenebrion_enabled = (bool)arg;
-		pr_info("SuiKernel IOCTL: Tenebrion set to %s\n", tenebrion_enabled ? "Enabled" : "Disabled");
+		tenebrion_set_enabled((bool)arg);
 		return 0;
 	case CMD_SPARXIE_SWAP:
 		sparxie_set_swappiness((int)arg);
 		return 0;
 	case CMD_AIRANI_CPUSET:
 		airani_enabled = (bool)arg;
-		pr_info("SuiKernel IOCTL: Airani CPUset set to %s\n", airani_enabled ? "Enabled" : "Disabled");
 		return 0;
 	case CMD_SANDEVISTAN:
 		sandevistan_enabled = (bool)arg;
-		pr_info("SuiKernel IOCTL: Sandevistan set to %s\n", sandevistan_enabled ? "Enabled" : "Disabled");
 		return 0;
 	default:
 		return -ENOTTY;
@@ -1154,3 +1147,38 @@ static int __init chr_dev_init(void)
 }
 
 fs_initcall(chr_dev_init);
+
+#ifdef CONFIG_ANYA_MELFISSA_THERMAL
+static struct delayed_work anya_init_work;
+
+static void anya_init_worker(struct work_struct *work)
+{
+	struct file *f;
+	loff_t pos = 0;
+	char cfg[16];
+	int ret;
+
+	f = filp_open("/data/SuiKernel/anya_thermal", O_RDONLY, 0);
+	if (IS_ERR(f))
+		return;
+
+	ret = kernel_read(f, cfg, sizeof(cfg) - 1, &pos);
+	filp_close(f, NULL);
+
+	if (ret > 0) {
+		if (cfg[0] == '0') {
+			anya_thermal_enabled = false;
+		} else if (cfg[0] == '1') {
+			anya_thermal_enabled = true;
+		}
+	}
+}
+
+static int __init anya_thermal_init(void)
+{
+	INIT_DELAYED_WORK(&anya_init_work, anya_init_worker);
+	schedule_delayed_work(&anya_init_work, msecs_to_jiffies(15000));
+	return 0;
+}
+late_initcall(anya_thermal_init);
+#endif

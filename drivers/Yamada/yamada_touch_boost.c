@@ -9,6 +9,9 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/input.h>
+#include <linux/fs.h>
+
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 
 #define BOOST_DURATION_MS   100
 
@@ -20,6 +23,63 @@ extern bool yamada_is_boosted;
 static DEFINE_SPINLOCK(boost_lock);
 
 static struct delayed_work boost_off_work;
+
+static int yamada_touch_boost_read_file(const char *path, char *buf, size_t size)
+{
+	struct file *f;
+	loff_t pos = 0;
+	int ret;
+
+	f = filp_open(path, O_RDONLY, 0);
+	if (IS_ERR(f))
+		return -1;
+
+	ret = kernel_read(f, buf, size - 1, &pos);
+	filp_close(f, NULL);
+
+	if (ret > 0) {
+		if (buf[ret - 1] == '\n')
+			buf[ret - 1] = '\0';
+		else
+			buf[ret] = '\0';
+	} else {
+		ret = -1;
+	}
+
+	return ret;
+}
+
+void yamada_touch_boost_set_mode(int mode)
+{
+	if (mode == 0) {
+		yamada_touch_boost_enabled = false;
+		yamada_touch_boost_off();
+	} else if (mode == 2) {
+		yamada_touch_boost_enabled = true;
+		yamada_touch_boost_duration = 300;
+	} else {
+		yamada_touch_boost_enabled = true;
+		yamada_touch_boost_duration = 100;
+	}
+}
+EXPORT_SYMBOL(yamada_touch_boost_set_mode);
+
+static struct delayed_work touch_boost_init_work;
+
+static void touch_boost_init_worker(struct work_struct *work)
+{
+	char cfg[16];
+
+	if (yamada_touch_boost_read_file("/data/SuiKernel/touch_boost", cfg, sizeof(cfg)) > 0) {
+		if (cfg[0] == '0') {
+			yamada_touch_boost_set_mode(0);
+		} else if (cfg[0] == '2') {
+			yamada_touch_boost_set_mode(2);
+		} else if (cfg[0] == '1') {
+			yamada_touch_boost_set_mode(1);
+		}
+	}
+}
 
 /* Hook from drivers/input/input.c */
 extern void (*yamada_boost_hook)(void);
@@ -63,6 +123,8 @@ static void kobo_trigger_boost(void) {
 
 static int __init yamada_touch_boost_init(void) {
 	INIT_DELAYED_WORK(&boost_off_work, do_boost_off);
+	INIT_DELAYED_WORK(&touch_boost_init_work, touch_boost_init_worker);
+	schedule_delayed_work(&touch_boost_init_work, msecs_to_jiffies(15000));
 
 	yamada_boost_hook = kobo_trigger_boost;
 
@@ -73,6 +135,7 @@ static int __init yamada_touch_boost_init(void) {
 static void __exit yamada_touch_boost_exit(void) {
 	yamada_boost_hook = NULL;
 
+	cancel_delayed_work_sync(&touch_boost_init_work);
 	cancel_delayed_work_sync(&boost_off_work);
 
 	pr_info("yamada_touch_boost: Unloaded\n");
