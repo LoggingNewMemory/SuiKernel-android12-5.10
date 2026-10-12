@@ -10,6 +10,9 @@
 #include <linux/spinlock.h>
 #include <linux/input.h>
 #include <linux/fs.h>
+#include "IOCTL_Library.h"
+
+void yamada_touch_boost_off(void);
 
 #define BOOST_DURATION_MS   100
 
