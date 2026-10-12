@@ -10,49 +10,24 @@
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/raco_override.h>
+#include <linux/suikernel.h>
 
 int sparxie_swappiness_val = 30;
 
 extern int vm_swappiness;
 
-static int sparxie_read_file(const char *path, char *buf, size_t size)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_RDONLY, 0);
-	if (IS_ERR(f))
-		return -1;
-
-	ret = kernel_read(f, buf, size - 1, &pos);
-	filp_close(f, NULL);
-
-	if (ret > 0) {
-		if (buf[ret - 1] == '\n')
-			buf[ret - 1] = '\0';
-		else
-			buf[ret] = '\0';
-	} else {
-		ret = -1;
-	}
-
-	return ret;
-}
-
 // We simply define a callback function that Raco will execute every 5s.
 // This actively pushes our value back into vm_swappiness, fighting vendor init!
 static void apply_swappiness_cb(void)
 {
-	char cfg[16];
-	int val = 0;
+	// Mandatory: /data must be checked
+	if (!sui_data_is_ready())
+		return;
 
-	if (sparxie_read_file("/data/SuiKernel/swappiness", cfg, sizeof(cfg)) > 0) {
-		if (kstrtoint(cfg, 10, &val) == 0 && val >= 10 && val <= 100) {
-			sparxie_swappiness_val = val;
-		}
-	}
+	if (!sui_is_feature_enabled("sparxie"))
+		return;
 
+	sparxie_swappiness_val = sui_read_int_config("swappiness", 30, 10, 100);
 	vm_swappiness = sparxie_swappiness_val;
 }
 
@@ -65,13 +40,9 @@ EXPORT_SYMBOL(sparxie_set_swappiness);
 
 static int __init sparxie_swap_init(void)
 {
-	/* 1. Apply immediately at boot */
-	vm_swappiness = sparxie_swappiness_val;
-	pr_info("sparxie: vm_swappiness set to %d\n", sparxie_swappiness_val);
-
-	/* 2. Hand long-term defence to Raco Sniper via callback */
+	/* Register defence with Raco Engine, awaiting /data check */
 	if (raco_register_rc_override(apply_swappiness_cb, "vm.swappiness") == 0) {
-		pr_info("sparxie: Swappiness defence delegated to Raco Engine\n");
+		pr_info("sparxie: Swappiness defence delegated to Raco Engine (awaiting /data)\n");
 	} else {
 		pr_err("sparxie: Failed to hook into Raco Framework\n");
 	}

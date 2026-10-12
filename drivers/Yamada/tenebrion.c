@@ -12,6 +12,7 @@
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
+#include <linux/suikernel.h>
 
 #define DPMS_PATH           "/sys/class/drm/card0-DSI-1/dpms"
 #define BACKLIGHT_PATH_1    "/sys/class/leds/lcd-backlight/brightness"
@@ -29,33 +30,7 @@ static struct freq_qos_request tenebrion_min_req[NR_CPUS];
 static struct freq_qos_request tenebrion_max_req[NR_CPUS];
 static bool qos_initialized[NR_CPUS];
 
-// File helpers
 
-static int tenebrion_read_file(const char *path, char *buf, size_t size)
-{
-    struct file *f;
-    loff_t pos = 0;
-    int ret;
-
-    f = filp_open(path, O_RDONLY, 0);
-    if (IS_ERR(f))
-        return -1;
-
-    ret = kernel_read(f, buf, size - 1, &pos);
-    filp_close(f, NULL);
-
-    if (ret > 0) {
-        /* strip trailing newline so comparisons are clean */
-        if (buf[ret - 1] == '\n')
-            buf[ret - 1] = '\0';
-        else
-            buf[ret] = '\0';
-    } else {
-        ret = -1;
-    }
-
-    return ret;
-}
 
 // QoS init — add requests for all online policy CPUs
 
@@ -231,7 +206,6 @@ static struct delayed_work tenebrion_init_work;
 
 static void tenebrion_init_worker(struct work_struct *work)
 {
-	char cfg[16];
 	struct file *f;
 	int i;
 	const char *backlight_paths[] = {
@@ -240,15 +214,13 @@ static void tenebrion_init_worker(struct work_struct *work)
 		NULL
 	};
 
-	if (tenebrion_read_file("/data/SuiKernel/tenebrion", cfg, sizeof(cfg)) > 0) {
-		if (cfg[0] == '0') {
-			tenebrion_set_enabled(false);
-			pr_info("tenebrion: disabled via /data/SuiKernel/tenebrion\n");
-			return;
-		} else if (cfg[0] == '1') {
-			tenebrion_set_enabled(true);
-		}
+	// Mandatory: /data must be checked
+	if (!sui_is_feature_enabled("tenebrion")) {
+		tenebrion_set_enabled(false);
+		pr_info("tenebrion: disabled via Manager config\n");
+		return;
 	}
+	tenebrion_set_enabled(true);
 
 	if (!tenebrion_enabled) {
 		pr_info("tenebrion: disabled, skipping init\n");
@@ -288,7 +260,7 @@ static int __init tenebrion_init(void)
     INIT_DELAYED_WORK(&tenebrion_init_work, tenebrion_init_worker);
     schedule_delayed_work(&tenebrion_init_work, msecs_to_jiffies(40000));
 
-    pr_info("tenebrion: active — using VFS polling\n");
+    pr_info("tenebrion: standing by for /data initialization\n");
     return 0;
 }
 

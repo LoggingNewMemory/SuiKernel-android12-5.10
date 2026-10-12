@@ -14,6 +14,7 @@
 #include <linux/rcupdate.h>
 #include <linux/string.h>
 #include <linux/raco_override.h>
+#include <linux/suikernel.h>
 
 #define ENGAGE_DELAY_MS     20000
 #define CPUSET_SCAN_MS       5000
@@ -24,31 +25,6 @@ static char all_cores_str[64];
 static char no_prime_cores_str[64];
 static char little_cores_str[64];
 static bool masks_calculated = false;
-
-static int airani_read_file(const char *path, char *buf, size_t size)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_RDONLY, 0);
-	if (IS_ERR(f))
-		return -1;
-
-	ret = kernel_read(f, buf, size - 1, &pos);
-	filp_close(f, NULL);
-
-	if (ret > 0) {
-		if (buf[ret - 1] == '\n')
-			buf[ret - 1] = '\0';
-		else
-			buf[ret] = '\0';
-	} else {
-		ret = -1;
-	}
-
-	return ret;
-}
 
 static int airani_write_file(const char *path, const char *buf)
 {
@@ -115,18 +91,16 @@ static void airani_calculate_dynamic_masks(void)
 
 static void airani_execute_cpuset_override(void)
 {
-	char cfg[16];
+	// Mandatory: /data must be checked
+	if (!sui_data_is_ready())
+		return;
 
-	/* Check persistent flag from Manager if available */
-	if (airani_read_file("/data/SuiKernel/airani", cfg, sizeof(cfg)) > 0) {
-		if (cfg[0] == '0') {
-			airani_enabled = false;
-			pr_info("iofi: disabled via /data/SuiKernel/airani\n");
-			return;
-		} else if (cfg[0] == '1') {
-			airani_enabled = true;
-		}
+	if (!sui_is_feature_enabled("airani")) {
+		airani_enabled = false;
+		pr_info("iofi: disabled via Manager config\n");
+		return;
 	}
+	airani_enabled = true;
 
 	if (!airani_enabled) {
 		pr_info("iofi: aborted by Manager IOCTL\n");
@@ -170,7 +144,7 @@ static int __init airani_cpuset_init(void)
 	else
 		pr_warn("iofi: Raco hook failed, continuing without it\n");
 
-	pr_info("iofi: active\n");
+	pr_info("iofi: standing by for /data initialization\n");
 	return 0;
 }
 

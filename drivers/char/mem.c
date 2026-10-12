@@ -14,6 +14,7 @@
 #include <linux/fs.h>
 #include <linux/workqueue.h>
 #include "../Yamada/IOCTL_Library.h"
+#include <linux/suikernel.h>
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -934,7 +935,7 @@ static const struct file_operations __maybe_unused kmem_fops = {
 };
 
 
-bool anya_thermal_enabled = true;
+bool anya_thermal_enabled = false;
 EXPORT_SYMBOL(anya_thermal_enabled);
 
 static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -1151,31 +1152,23 @@ static struct delayed_work anya_init_work;
 
 static void anya_init_worker(struct work_struct *work)
 {
-	struct file *f;
-	loff_t pos = 0;
-	char cfg[16];
-	int ret;
-
-	f = filp_open("/data/SuiKernel/anya_thermal", O_RDONLY, 0);
-	if (IS_ERR(f))
+	// Mandatory: /data must be checked
+	if (!sui_is_feature_enabled("anya_thermal")) {
+		anya_thermal_enabled = false;
+		pr_info("anya_thermal: disabled via Manager config\n");
 		return;
-
-	ret = kernel_read(f, cfg, sizeof(cfg) - 1, &pos);
-	filp_close(f, NULL);
-
-	if (ret > 0) {
-		if (cfg[0] == '0') {
-			anya_thermal_enabled = false;
-		} else if (cfg[0] == '1') {
-			anya_thermal_enabled = true;
-		}
 	}
+
+	anya_thermal_enabled = true;
+	pr_info("anya_thermal: active (temperature spoofing to 30C)\n");
 }
 
 static int __init anya_thermal_init(void)
 {
 	INIT_DELAYED_WORK(&anya_init_work, anya_init_worker);
 	schedule_delayed_work(&anya_init_work, msecs_to_jiffies(15000));
+
+	pr_info("anya_thermal: standing by for /data initialization\n");
 	return 0;
 }
 late_initcall(anya_thermal_init);

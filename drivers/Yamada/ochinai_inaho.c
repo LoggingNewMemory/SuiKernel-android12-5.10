@@ -21,6 +21,7 @@
 #include <linux/string.h>
 #include <linux/atomic.h>
 #include <linux/pid.h>
+#include <linux/suikernel.h>
 #include <uapi/linux/sched/types.h>
 
 #define ENGAGE_DELAY_MS     20000
@@ -32,31 +33,6 @@ bool inaho_enabled = true;
 
 static struct pm_qos_request inaho_pm_qos;
 static bool pm_qos_active;
-
-static int inaho_read_file(const char *path, char *buf, size_t size)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_RDONLY, 0);
-	if (IS_ERR(f))
-		return -1;
-
-	ret = kernel_read(f, buf, size - 1, &pos);
-	filp_close(f, NULL);
-
-	if (ret > 0) {
-		if (buf[ret - 1] == '\n')
-			buf[ret - 1] = '\0';
-		else
-			buf[ret] = '\0';
-	} else {
-		ret = -1;
-	}
-
-	return ret;
-}
 
 static void inaho_pm_qos_engage(void)
 {
@@ -80,19 +56,35 @@ void inaho_set_enabled(bool enabled)
 EXPORT_SYMBOL(inaho_set_enabled);
 
 static struct delayed_work inaho_init_work;
+static bool inaho_kprobe_registered = false;
 
 static void inaho_init_worker(struct work_struct *work)
 {
-	char cfg[16];
+	int ret;
 
-	if (inaho_read_file("/data/SuiKernel/inaho", cfg, sizeof(cfg)) > 0) {
-		if (cfg[0] == '0') {
-			inaho_set_enabled(false);
-			return;
-		} else if (cfg[0] == '1') {
-			inaho_set_enabled(true);
-		}
+	// Mandatory: /data must be checked
+	if (!sui_is_feature_enabled("inaho")) {
+		inaho_set_enabled(false);
+		pr_info("inaho: disabled via Manager config\n");
+		return;
 	}
+	inaho_set_enabled(true);
+
+	if (!inaho_enabled)
+		return;
+
+	inaho_pm_qos_engage();
+
+	if (!inaho_kprobe_registered) {
+		ret = register_kprobe(&inaho_kprobe);
+		if (ret < 0) {
+			pr_err("inaho: failed to register kprobe: %d\n", ret);
+			return;
+		}
+		inaho_kprobe_registered = true;
+	}
+
+	pr_info("inaho: active — kprobes hooked\n");
 }
 
 // Audio threads
@@ -174,32 +166,20 @@ static struct kprobe inaho_kprobe = {
 
 static int __init inaho_audio_enhance_init(void)
 {
-	int ret;
-
-	if (!inaho_enabled) {
-		pr_info("inaho: disabled via module param\n");
-		return 0;
-	}
-
-	inaho_pm_qos_engage();
-
-	ret = register_kprobe(&inaho_kprobe);
-	if (ret < 0) {
-		pr_err("inaho: failed to register kprobe: %d\n", ret);
-		return ret;
-	}
-
 	INIT_DELAYED_WORK(&inaho_init_work, inaho_init_worker);
 	schedule_delayed_work(&inaho_init_work, msecs_to_jiffies(15000));
 
-	pr_info("inaho: active — kprobes hooked\n");
+	pr_info("inaho: standing by for /data initialization\n");
 	return 0;
 }
 
 static void __exit inaho_audio_enhance_exit(void)
 {
 	cancel_delayed_work_sync(&inaho_init_work);
-	unregister_kprobe(&inaho_kprobe);
+	if (inaho_kprobe_registered) {
+		unregister_kprobe(&inaho_kprobe);
+		inaho_kprobe_registered = false;
+	}
 
 	if (pm_qos_active) {
 		cpu_latency_qos_remove_request(&inaho_pm_qos);

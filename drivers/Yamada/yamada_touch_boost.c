@@ -10,6 +10,7 @@
 #include <linux/spinlock.h>
 #include <linux/input.h>
 #include <linux/fs.h>
+#include <linux/suikernel.h>
 #include "IOCTL_Library.h"
 
 void yamada_touch_boost_off(void);
@@ -24,31 +25,6 @@ extern bool yamada_is_boosted;
 static DEFINE_SPINLOCK(boost_lock);
 
 static struct delayed_work boost_off_work;
-
-static int yamada_touch_boost_read_file(const char *path, char *buf, size_t size)
-{
-	struct file *f;
-	loff_t pos = 0;
-	int ret;
-
-	f = filp_open(path, O_RDONLY, 0);
-	if (IS_ERR(f))
-		return -1;
-
-	ret = kernel_read(f, buf, size - 1, &pos);
-	filp_close(f, NULL);
-
-	if (ret > 0) {
-		if (buf[ret - 1] == '\n')
-			buf[ret - 1] = '\0';
-		else
-			buf[ret] = '\0';
-	} else {
-		ret = -1;
-	}
-
-	return ret;
-}
 
 void yamada_touch_boost_set_mode(int mode)
 {
@@ -69,17 +45,20 @@ static struct delayed_work touch_boost_init_work;
 
 static void touch_boost_init_worker(struct work_struct *work)
 {
-	char cfg[16];
+	int mode;
 
-	if (yamada_touch_boost_read_file("/data/SuiKernel/touch_boost", cfg, sizeof(cfg)) > 0) {
-		if (cfg[0] == '0') {
-			yamada_touch_boost_set_mode(0);
-		} else if (cfg[0] == '2') {
-			yamada_touch_boost_set_mode(2);
-		} else if (cfg[0] == '1') {
-			yamada_touch_boost_set_mode(1);
-		}
+	// Mandatory: /data must be checked
+	mode = sui_get_touch_boost_mode();
+	if (mode == 0) {
+		yamada_touch_boost_set_mode(0);
+		yamada_boost_hook = NULL;
+		pr_info("yamada_touch_boost: disabled via Manager config\n");
+		return;
 	}
+	yamada_touch_boost_set_mode(mode);
+
+	yamada_boost_hook = kobo_trigger_boost;
+	pr_info("yamada_touch_boost: Active (Direct Schedutil Mode)\n");
 }
 
 /* Hook from drivers/input/input.c */
@@ -127,9 +106,7 @@ static int __init yamada_touch_boost_init(void) {
 	INIT_DELAYED_WORK(&touch_boost_init_work, touch_boost_init_worker);
 	schedule_delayed_work(&touch_boost_init_work, msecs_to_jiffies(15000));
 
-	yamada_boost_hook = kobo_trigger_boost;
-
-	pr_info("yamada_touch_boost: Active (Direct Schedutil Mode)\n");
+	pr_info("yamada_touch_boost: standing by for /data initialization\n");
 	return 0;
 }
 
