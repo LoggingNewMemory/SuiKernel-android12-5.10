@@ -29,16 +29,15 @@ static void do_boost(struct work_struct *work)
 	unsigned int cpu;
 	struct cpufreq_policy *policy;
 
+	if (!sandevistan_enabled) {
+		pr_info("sandevistan_boot: disabled via IOCTL\n");
+		return;
+	}
+
 	// Mandatory: /data must be checked
 	if (!sui_is_feature_enabled("sandevistan")) {
 		sandevistan_enabled = false;
 		pr_info("sandevistan_boot: disabled via Manager config\n");
-		return;
-	}
-	sandevistan_enabled = true;
-
-	if (!sandevistan_enabled) {
-		pr_info("sandevistan_boot: aborted by Manager IOCTL\n");
 		return;
 	}
 

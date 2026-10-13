@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/fs.h>
+#include <linux/mm.h>
 #include <linux/raco_override.h>
 
 static void set_zram_to_zstd(void)
@@ -14,12 +15,7 @@ static void set_zram_to_zstd(void)
 	struct file *filp;
 	loff_t pos;
 
-	filp = filp_open("/proc/sys/vm/page-cluster", O_WRONLY, 0);
-	if (!IS_ERR(filp)) {
-		pos = 0;
-		kernel_write(filp, "0\n", 2, &pos);
-		filp_close(filp, NULL);
-	}
+	WRITE_ONCE(page_cluster, 0);
 
 	filp = filp_open("/sys/kernel/mm/swap/vma_ra_enabled", O_WRONLY, 0);
 	if (!IS_ERR(filp)) {

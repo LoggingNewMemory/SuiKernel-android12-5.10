@@ -56,7 +56,7 @@ static void enforce_kswapd_affinity(void)
 	rcu_read_unlock();
 
 	if (!found) {
-		pr_warn("Kureiji Ollie: Failed to find kswapd0 process!\n");
+		pr_warn_once("Kureiji Ollie: Failed to find kswapd0 process!\n");
 	}
 }
 

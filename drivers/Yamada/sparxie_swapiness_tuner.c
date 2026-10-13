@@ -27,7 +27,9 @@ static void apply_swappiness_cb(void)
 	if (!sui_is_feature_enabled("sparxie"))
 		return;
 
-	sparxie_swappiness_val = sui_read_int_config("swappiness", 30, 10, 100);
+	if (sui_manager_is_installed())
+		sparxie_swappiness_val = sui_read_int_config("swappiness", sparxie_swappiness_val, 10, 100);
+
 	vm_swappiness = sparxie_swappiness_val;
 }
 

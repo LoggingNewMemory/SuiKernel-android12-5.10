@@ -45,6 +45,7 @@ static int airani_write_file(const char *path, const char *buf)
 static void airani_calculate_dynamic_masks(void)
 {
 	int cpu;
+	int cap;
 	int max_cap = 0, min_cap = 1024;
 	struct cpumask all_mask, no_prime_mask, little_mask;
 	
@@ -54,7 +55,7 @@ static void airani_calculate_dynamic_masks(void)
 
 	/* 1. Find min and max capacities */
 	for_each_possible_cpu(cpu) {
-		int cap = arch_scale_cpu_capacity(cpu);
+		cap = arch_scale_cpu_capacity(cpu);
 		if (cap > max_cap)
 			max_cap = cap;
 		if (cap < min_cap)
@@ -64,7 +65,7 @@ static void airani_calculate_dynamic_masks(void)
 
 	/* 2. Group CPUs into masks based on capacity */
 	for_each_possible_cpu(cpu) {
-		int cap = arch_scale_cpu_capacity(cpu);
+		cap = arch_scale_cpu_capacity(cpu);
 		
 		/* If it's a little core, add to little_mask */
 		if (cap == min_cap)
@@ -80,7 +81,8 @@ static void airani_calculate_dynamic_masks(void)
 	snprintf(no_prime_cores_str, sizeof(no_prime_cores_str), "%*pbl\n", cpumask_pr_args(&no_prime_mask));
 	snprintf(little_cores_str, sizeof(little_cores_str), "%*pbl\n", cpumask_pr_args(&little_mask));
 
-	pr_info("iofi: Topologies -> All: %s NoPrime: %s Little: %s", all_cores_str, no_prime_cores_str, little_cores_str);
+	pr_info("iofi: Topologies -> All: %*pbl NoPrime: %*pbl Little: %*pbl\n",
+		cpumask_pr_args(&all_mask), cpumask_pr_args(&no_prime_mask), cpumask_pr_args(&little_mask));
 	masks_calculated = true;
 }
 
@@ -95,15 +97,12 @@ static void airani_execute_cpuset_override(void)
 	if (!sui_data_is_ready())
 		return;
 
+	if (!airani_enabled)
+		return;
+
 	if (!sui_is_feature_enabled("airani")) {
 		airani_enabled = false;
 		pr_info("iofi: disabled via Manager config\n");
-		return;
-	}
-	airani_enabled = true;
-
-	if (!airani_enabled) {
-		pr_info("iofi: aborted by Manager IOCTL\n");
 		return;
 	}
 

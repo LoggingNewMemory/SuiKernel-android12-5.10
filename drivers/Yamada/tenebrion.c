@@ -171,6 +171,11 @@ static void tenebrion_poll_worker(struct work_struct *work)
 	char buf[16] = {0};
 	bool currently_off = false;
 
+	if (!tenebrion_enabled) {
+		schedule_delayed_work(&tenebrion_poll_work, msecs_to_jiffies(POLL_INTERVAL_ON_MS));
+		return;
+	}
+
 	// 1. Primary check: Backlight brightness. "0" means screen off.
 	if (active_backlight_path && sui_read_raw_file(active_backlight_path, buf, sizeof(buf)) > 0) {
 		if (buf[0] == '0' && buf[1] == '\0') {
@@ -214,16 +219,15 @@ static void tenebrion_init_worker(struct work_struct *work)
 		NULL
 	};
 
+	if (!tenebrion_enabled) {
+		pr_info("tenebrion: disabled via IOCTL, skipping init\n");
+		return;
+	}
+
 	// Mandatory: /data must be checked
 	if (!sui_is_feature_enabled("tenebrion")) {
 		tenebrion_set_enabled(false);
 		pr_info("tenebrion: disabled via Manager config\n");
-		return;
-	}
-	tenebrion_set_enabled(true);
-
-	if (!tenebrion_enabled) {
-		pr_info("tenebrion: disabled, skipping init\n");
 		return;
 	}
 

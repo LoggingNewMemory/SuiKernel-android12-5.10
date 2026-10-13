@@ -139,16 +139,17 @@ static void inaho_init_worker(struct work_struct *work)
 {
 	int ret;
 
+	if (!inaho_enabled) {
+		pr_info("inaho: disabled via IOCTL, skipping init\n");
+		return;
+	}
+
 	// Mandatory: /data must be checked
 	if (!sui_is_feature_enabled("inaho")) {
 		inaho_set_enabled(false);
 		pr_info("inaho: disabled via Manager config\n");
 		return;
 	}
-	inaho_set_enabled(true);
-
-	if (!inaho_enabled)
-		return;
 
 	inaho_pm_qos_engage();
 
