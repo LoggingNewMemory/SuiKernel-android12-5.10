@@ -74,7 +74,7 @@ static int __init moona_hoshinova_zram_init(void)
 	if (err) {
 		pr_err("moona_zram: Failed to register with Raco!\n");
 	} else {
-		pr_info("moona_zram: Moona Hoshinova ZRAM Tweaks Applied\n");
+		pr_info("moona_zram: standing by for /data initialization\n");
 	}
 
 	return 0;
