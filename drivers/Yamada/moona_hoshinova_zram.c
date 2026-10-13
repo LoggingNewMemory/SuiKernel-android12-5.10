@@ -9,21 +9,60 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/raco_override.h>
+#include <linux/suikernel.h>
 
-static void set_zram_to_zstd(void)
+bool moona_enabled = true;
+
+static void moona_apply_tweaks(bool enable)
 {
 	struct file *filp;
 	loff_t pos;
 
-	WRITE_ONCE(page_cluster, 0);
+	if (enable) {
+		WRITE_ONCE(page_cluster, 0);
 
-	filp = filp_open("/sys/kernel/mm/swap/vma_ra_enabled", O_WRONLY, 0);
-	if (!IS_ERR(filp)) {
-		pos = 0;
-		kernel_write(filp, "true\n", 5, &pos);
-		filp_close(filp, NULL);
+		filp = filp_open("/sys/kernel/mm/swap/vma_ra_enabled", O_WRONLY, 0);
+		if (!IS_ERR(filp)) {
+			pos = 0;
+			kernel_write(filp, "true\n", 5, &pos);
+			filp_close(filp, NULL);
+		}
+	} else {
+		WRITE_ONCE(page_cluster, 3);
+
+		filp = filp_open("/sys/kernel/mm/swap/vma_ra_enabled", O_WRONLY, 0);
+		if (!IS_ERR(filp)) {
+			pos = 0;
+			kernel_write(filp, "false\n", 6, &pos);
+			filp_close(filp, NULL);
+		}
 	}
 }
+
+static void set_zram_to_zstd(void)
+{
+	// Mandatory: /data must be checked
+	if (!sui_data_is_ready())
+		return;
+
+	if (!moona_enabled)
+		return;
+
+	if (!sui_is_feature_enabled("moona_zram")) {
+		moona_set_enabled(false);
+		pr_info("moona_zram: disabled via Manager config\n");
+		return;
+	}
+
+	moona_apply_tweaks(true);
+}
+
+void moona_set_enabled(bool enabled)
+{
+	moona_enabled = enabled;
+	moona_apply_tweaks(enabled);
+}
+EXPORT_SYMBOL(moona_set_enabled);
 
 static int __init moona_hoshinova_zram_init(void)
 {

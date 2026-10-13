@@ -17,6 +17,8 @@ extern int  sparxie_swappiness_val;
 extern void sparxie_set_swappiness(int val);
 extern bool airani_enabled;
 extern bool sandevistan_enabled;
+extern bool moona_enabled;
+extern void moona_set_enabled(bool enabled);
 
 /* Magic IOCTL Commands for /dev/null */
 #define CMD_ANYA_THERMAL 0x392C8989
@@ -28,5 +30,6 @@ extern bool sandevistan_enabled;
 #define CMD_SPARXIE_SWAP 0x1B3FB033
 #define CMD_AIRANI_CPUSET 0x2FC6501B
 #define CMD_SANDEVISTAN 0x27B55B18
+#define CMD_MOONA_ZRAM 0x3E8B1A4C
 
 #endif /* _IOCTL_LIBRARY_H */
