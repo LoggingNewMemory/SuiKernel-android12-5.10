@@ -13,6 +13,9 @@
 #include <linux/suikernel.h>
 #include "IOCTL_Library.h"
 
+/* Hook from drivers/input/input.c */
+extern void (*yamada_boost_hook)(void);
+
 void yamada_touch_boost_off(void);
 
 #define BOOST_DURATION_MS   100
@@ -25,6 +28,7 @@ extern bool yamada_is_boosted;
 static DEFINE_SPINLOCK(boost_lock);
 
 static struct delayed_work boost_off_work;
+static struct delayed_work touch_boost_init_work;
 
 void yamada_touch_boost_set_mode(int mode)
 {
@@ -40,29 +44,6 @@ void yamada_touch_boost_set_mode(int mode)
 	}
 }
 EXPORT_SYMBOL(yamada_touch_boost_set_mode);
-
-static struct delayed_work touch_boost_init_work;
-
-static void touch_boost_init_worker(struct work_struct *work)
-{
-	int mode;
-
-	// Mandatory: /data must be checked
-	mode = sui_get_touch_boost_mode();
-	if (mode == 0) {
-		yamada_touch_boost_set_mode(0);
-		yamada_boost_hook = NULL;
-		pr_info("yamada_touch_boost: disabled via Manager config\n");
-		return;
-	}
-	yamada_touch_boost_set_mode(mode);
-
-	yamada_boost_hook = kobo_trigger_boost;
-	pr_info("yamada_touch_boost: Active (Direct Schedutil Mode)\n");
-}
-
-/* Hook from drivers/input/input.c */
-extern void (*yamada_boost_hook)(void);
 
 static void do_boost_off(struct work_struct *work) {
 	unsigned long flags;
@@ -84,7 +65,6 @@ void yamada_touch_boost_off(void) {
 }
 EXPORT_SYMBOL(yamada_touch_boost_off);
 
-
 static void kobo_trigger_boost(void) {
 	unsigned long flags;
 
@@ -99,6 +79,24 @@ static void kobo_trigger_boost(void) {
 
 	/* Refresh the delayed work timer on every touch event */
 	mod_delayed_work(system_wq, &boost_off_work, msecs_to_jiffies(yamada_touch_boost_duration));
+}
+
+static void touch_boost_init_worker(struct work_struct *work)
+{
+	int mode;
+
+	// Mandatory: /data must be checked
+	mode = sui_get_touch_boost_mode();
+	if (mode == 0) {
+		yamada_touch_boost_set_mode(0);
+		yamada_boost_hook = NULL;
+		pr_info("yamada_touch_boost: disabled via Manager config\n");
+		return;
+	}
+	yamada_touch_boost_set_mode(mode);
+
+	yamada_boost_hook = kobo_trigger_boost;
+	pr_info("yamada_touch_boost: Active (Direct Schedutil Mode)\n");
 }
 
 static int __init yamada_touch_boost_init(void) {

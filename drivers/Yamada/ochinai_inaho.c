@@ -58,35 +58,6 @@ EXPORT_SYMBOL(inaho_set_enabled);
 static struct delayed_work inaho_init_work;
 static bool inaho_kprobe_registered = false;
 
-static void inaho_init_worker(struct work_struct *work)
-{
-	int ret;
-
-	// Mandatory: /data must be checked
-	if (!sui_is_feature_enabled("inaho")) {
-		inaho_set_enabled(false);
-		pr_info("inaho: disabled via Manager config\n");
-		return;
-	}
-	inaho_set_enabled(true);
-
-	if (!inaho_enabled)
-		return;
-
-	inaho_pm_qos_engage();
-
-	if (!inaho_kprobe_registered) {
-		ret = register_kprobe(&inaho_kprobe);
-		if (ret < 0) {
-			pr_err("inaho: failed to register kprobe: %d\n", ret);
-			return;
-		}
-		inaho_kprobe_registered = true;
-	}
-
-	pr_info("inaho: active — kprobes hooked\n");
-}
-
 // Audio threads
 static const char * const audio_threads[] = {
 	"audioserver",
@@ -163,6 +134,35 @@ static struct kprobe inaho_kprobe = {
 	.symbol_name = "__set_task_comm",
 	.pre_handler = inaho_set_task_comm_pre,
 };
+
+static void inaho_init_worker(struct work_struct *work)
+{
+	int ret;
+
+	// Mandatory: /data must be checked
+	if (!sui_is_feature_enabled("inaho")) {
+		inaho_set_enabled(false);
+		pr_info("inaho: disabled via Manager config\n");
+		return;
+	}
+	inaho_set_enabled(true);
+
+	if (!inaho_enabled)
+		return;
+
+	inaho_pm_qos_engage();
+
+	if (!inaho_kprobe_registered) {
+		ret = register_kprobe(&inaho_kprobe);
+		if (ret < 0) {
+			pr_err("inaho: failed to register kprobe: %d\n", ret);
+			return;
+		}
+		inaho_kprobe_registered = true;
+	}
+
+	pr_info("inaho: active — kprobes hooked\n");
+}
 
 static int __init inaho_audio_enhance_init(void)
 {
