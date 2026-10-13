@@ -3,83 +3,64 @@
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
-#include <linux/cpufreq.h>
-#include <linux/sched/cpufreq.h>
 #include <linux/workqueue.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <linux/input.h>
-#include <linux/fs.h>
 #include <linux/suikernel.h>
 #include "IOCTL_Library.h"
 
 /* Hook from drivers/input/input.c */
 extern void (*yamada_boost_hook)(void);
 
-void yamada_touch_boost_off(void);
+/* Direct schedutil boost flag from kernel/sched/cpufreq_schedutil.c */
+extern bool yamada_is_boosted;
 
-#define BOOST_DURATION_MS   100
+#define BOOST_DURATION_BALANCED_MS 100
+#define BOOST_DURATION_GAMING_MS   300
 
 bool yamada_touch_boost_enabled = true;
-
-int yamada_touch_boost_duration = BOOST_DURATION_MS;
-
-extern bool yamada_is_boosted;
-static DEFINE_SPINLOCK(boost_lock);
+int yamada_touch_boost_duration = BOOST_DURATION_BALANCED_MS;
 
 static struct delayed_work boost_off_work;
 static struct delayed_work touch_boost_init_work;
+
+static void yamada_boost_off_work(struct work_struct *work)
+{
+	WRITE_ONCE(yamada_is_boosted, false);
+}
+
+void yamada_touch_boost_off(void)
+{
+	cancel_delayed_work_sync(&boost_off_work);
+	WRITE_ONCE(yamada_is_boosted, false);
+}
+EXPORT_SYMBOL(yamada_touch_boost_off);
+
+static void yamada_touch_boost_trigger(void)
+{
+	WRITE_ONCE(yamada_is_boosted, true);
+	mod_delayed_work(system_wq, &boost_off_work, msecs_to_jiffies(yamada_touch_boost_duration));
+}
 
 void yamada_touch_boost_set_mode(int mode)
 {
 	if (mode == 0) {
 		yamada_touch_boost_enabled = false;
+		WRITE_ONCE(yamada_boost_hook, NULL);
 		yamada_touch_boost_off();
+		pr_info("yamada_touch_boost: disabled\n");
 	} else if (mode == 2) {
 		yamada_touch_boost_enabled = true;
-		yamada_touch_boost_duration = 300;
+		yamada_touch_boost_duration = BOOST_DURATION_GAMING_MS;
+		WRITE_ONCE(yamada_boost_hook, yamada_touch_boost_trigger);
+		pr_info("yamada_touch_boost: gaming mode (300ms)\n");
 	} else {
 		yamada_touch_boost_enabled = true;
-		yamada_touch_boost_duration = 100;
+		yamada_touch_boost_duration = BOOST_DURATION_BALANCED_MS;
+		WRITE_ONCE(yamada_boost_hook, yamada_touch_boost_trigger);
+		pr_info("yamada_touch_boost: balanced mode (100ms)\n");
 	}
 }
 EXPORT_SYMBOL(yamada_touch_boost_set_mode);
-
-static void do_boost_off(struct work_struct *work) {
-	unsigned long flags;
-	int cpu;
-
-	spin_lock_irqsave(&boost_lock, flags);
-	WRITE_ONCE(yamada_is_boosted, false);
-	spin_unlock_irqrestore(&boost_lock, flags);
-
-	for_each_online_cpu(cpu) {
-		cpufreq_update_policy(cpu);
-	}
-
-}
-
-void yamada_touch_boost_off(void) {
-	cancel_delayed_work_sync(&boost_off_work);
-	do_boost_off(NULL);
-}
-EXPORT_SYMBOL(yamada_touch_boost_off);
-
-static void kobo_trigger_boost(void) {
-	unsigned long flags;
-
-	if (!yamada_touch_boost_enabled) 
-		return;
-
-	spin_lock_irqsave(&boost_lock, flags);
-	if (!yamada_is_boosted) {
-		WRITE_ONCE(yamada_is_boosted, true);
-	}
-	spin_unlock_irqrestore(&boost_lock, flags);
-
-	/* Refresh the delayed work timer on every touch event */
-	mod_delayed_work(system_wq, &boost_off_work, msecs_to_jiffies(yamada_touch_boost_duration));
-}
 
 static void touch_boost_init_worker(struct work_struct *work)
 {
@@ -87,34 +68,28 @@ static void touch_boost_init_worker(struct work_struct *work)
 
 	// Mandatory: /data must be checked
 	mode = sui_get_touch_boost_mode();
-	if (mode == 0) {
-		yamada_touch_boost_set_mode(0);
-		yamada_boost_hook = NULL;
-		pr_info("yamada_touch_boost: disabled via Manager config\n");
-		return;
-	}
 	yamada_touch_boost_set_mode(mode);
-
-	yamada_boost_hook = kobo_trigger_boost;
-	pr_info("yamada_touch_boost: Active (Direct Schedutil Mode)\n");
 }
 
-static int __init yamada_touch_boost_init(void) {
-	INIT_DELAYED_WORK(&boost_off_work, do_boost_off);
+static int __init yamada_touch_boost_init(void)
+{
+	INIT_DELAYED_WORK(&boost_off_work, yamada_boost_off_work);
 	INIT_DELAYED_WORK(&touch_boost_init_work, touch_boost_init_worker);
-	schedule_delayed_work(&touch_boost_init_work, msecs_to_jiffies(15000));
 
-	pr_info("yamada_touch_boost: standing by for /data initialization\n");
+	// Default to balanced mode until /data config is evaluated
+	yamada_touch_boost_set_mode(1);
+
+	schedule_delayed_work(&touch_boost_init_work, msecs_to_jiffies(15000));
+	pr_info("yamada_touch_boost: initialized (awaiting /data config)\n");
 	return 0;
 }
 
-static void __exit yamada_touch_boost_exit(void) {
-	yamada_boost_hook = NULL;
-
+static void __exit yamada_touch_boost_exit(void)
+{
+	WRITE_ONCE(yamada_boost_hook, NULL);
 	cancel_delayed_work_sync(&touch_boost_init_work);
-	cancel_delayed_work_sync(&boost_off_work);
-
-	pr_info("yamada_touch_boost: Unloaded\n");
+	yamada_touch_boost_off();
+	pr_info("yamada_touch_boost: unloaded\n");
 }
 
 module_init(yamada_touch_boost_init);
