@@ -13,6 +13,8 @@
 
 bool moona_enabled = true;
 
+void moona_set_enabled(bool enabled);
+
 static void moona_apply_tweaks(bool enable)
 {
 	struct file *filp;
