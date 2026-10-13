@@ -1,6 +1,6 @@
 // sandevistan_boot.c
 // SPDX-License-Identifier: GPL-3.0-only
-// Sandevistan Boot — min=max lock for 30s, GKI 2.0 safe (PM QoS Method)
+// Sandevistan Boot — min=max lock for 10s
 // Author: Kanagawa Yamada
 
 #include <linux/module.h>
@@ -29,17 +29,12 @@ static void do_boost(struct work_struct *work)
 	unsigned int cpu;
 	struct cpufreq_policy *policy;
 
-	if (!sandevistan_enabled) {
-		pr_info("sandevistan_boot: disabled via IOCTL\n");
-		return;
-	}
-
 	// Mandatory: /data must be checked
-	if (!sui_is_feature_enabled("sandevistan")) {
-		sandevistan_enabled = false;
-		pr_info("sandevistan_boot: disabled via Manager config\n");
+	if (!sui_data_is_ready())
 		return;
-	}
+
+	if (!sui_is_feature_enabled("sandevistan"))
+		return;
 
     pr_info("sandevistan_boot: jacking in — locking min=max via QoS\n");
 
