@@ -2,17 +2,16 @@
 # Makefile for Yamada Custom Android Drivers
 #
 
-obj-$(CONFIG_OCHINAI_INAHO_AUDIO) += ochinai_inaho_audio.o
+obj-$(CONFIG_OCHINAI_INAHO) += ochinai_inaho.o
 obj-$(CONFIG_SPARXIE_SWAP_TUNER) += sparxie_swapiness_tuner.o
 obj-$(CONFIG_RACO_RC_OVERRIDE) += raco_rc_override.o
-obj-$(CONFIG_PAVOLIA_REINE_RESETPROP) += pavolia_reine_resetprop.o
+obj-$(CONFIG_PAVOLIA_REINE_RESETPROP) += pavolia_reine_setprop.o
 obj-$(CONFIG_SANDEVISTAN_BOOT) += sandevistan_boot.o
-obj-$(CONFIG_YAMADA_GAMING_BOOST) += yamada_gaming_boost.o
+obj-$(CONFIG_YAMADA_TOUCH_BOOST) += yamada_touch_boost.o
 obj-$(CONFIG_YAMADA_TENEBRION) += tenebrion.o
 obj-$(CONFIG_SCHEDUTIL_ENFORCER) += schedutil_enforcer.o
 obj-$(CONFIG_YAMADA_DEV_IDENTIFICATION) += yamada_dev_identification.o
 obj-$(CONFIG_AYUNDA_RISU_SAFEPROP) += ayunda_risu_safeprop.o
 obj-$(CONFIG_AIRANI_IOFIFTEEN_CPUSET) += airani_iofifteen_cpuset.o
-obj-$(CONFIG_ANYA_MELFISSA_THERMAL) += anya_disable_thermal.o
 obj-$(CONFIG_MOONA_HOSHINOVA_ZRAM) += moona_hoshinova_zram.o
 obj-$(CONFIG_KUREIJI_OLLIE_AFFINITY) += kureiji_ollie_affinity.o

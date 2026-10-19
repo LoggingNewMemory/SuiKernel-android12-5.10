@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/*
- * drivers/misc/pavolia_reine_resetprop.c
- * Pavolia Reine Setprop Engine - Inject Android properties from kernel
- * Author: Kanagawa Yamada
- */
+// drivers/misc/pavolia_reine_setprop.c
+// Pavolia Reine Setprop Engine - Inject Android properties from kernel
+// Author: Kanagawa Yamada
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -13,18 +11,18 @@
 #include <linux/workqueue.h>
 #include <linux/string.h>
 #include <linux/fs.h>
-#include <linux/pavolia_reine_resetprop.h>
+#include <linux/pavolia_reine_setprop.h>
 
 extern void ksu_pavolia_add_prop(const char *prop, const char *val);
 
 /**
- * pavolia_reine_resetprop - Queues an Android property injection
+ * pavolia_reine_setprop - Queues an Android property injection
  * @prop: Property name
  * @val: Property value
  * * Injects it securely by passing it to KernelSU's init.rc hook,
  * which instructs Android init to naturally set the property during boot.
  */
-int pavolia_reine_resetprop(const char *prop, const char *val)
+int pavolia_reine_setprop(const char *prop, const char *val)
 {
 	if (!prop || !val)
 		return -EINVAL;
@@ -36,7 +34,7 @@ int pavolia_reine_resetprop(const char *prop, const char *val)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(pavolia_reine_resetprop);
+EXPORT_SYMBOL_GPL(pavolia_reine_setprop);
 
 static int __init pavolia_reine_init(void)
 {

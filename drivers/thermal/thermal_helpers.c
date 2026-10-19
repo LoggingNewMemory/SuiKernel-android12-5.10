@@ -18,10 +18,12 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/sysfs.h>
-
 #include <trace/events/thermal.h>
-
 #include "thermal_core.h"
+
+#ifdef CONFIG_ANYA_MELFISSA_THERMAL
+extern bool anya_thermal_enabled;
+#endif
 
 int get_tz_trend(struct thermal_zone_device *tz, int trip)
 {
@@ -118,7 +120,7 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 #ifdef CONFIG_ANYA_MELFISSA_THERMAL
 	// Modification of Anya Thermal. Scale down high temperatures
 	// so it stays cool but still dynamic to avoid HAL crashes.
-	if (!ret && temp && *temp > 30000) {
+	if (!ret && temp && *temp > 30000 && anya_thermal_enabled) {
 		*temp = 30000 + ((*temp - 30000) / 8);
 		if (*temp > 40000)
 			*temp = 40000;

@@ -9,6 +9,12 @@
  *  Shared /dev/zero mmapping support, Feb 2000, Kanoj Sarcar <kanoj@sgi.com>
  */
 
+
+#include <linux/capability.h>
+#include <linux/fs.h>
+#include <linux/workqueue.h>
+#include "../Yamada/IOCTL_Library.h"
+#include <linux/suikernel.h>
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -928,13 +934,58 @@ static const struct file_operations __maybe_unused kmem_fops = {
 #endif
 };
 
+
+bool anya_thermal_enabled = false;
+EXPORT_SYMBOL(anya_thermal_enabled);
+
+static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case CMD_ANYA_THERMAL:
+		anya_thermal_enabled = (bool)arg;
+		return 0;
+	case CMD_YAMADA_TOUCH_BOOST_DISABLE:
+		yamada_touch_boost_set_mode(0);
+		return 0;
+	case CMD_YAMADA_TOUCH_BOOST_BALANCED:
+		yamada_touch_boost_set_mode(1);
+		return 0;
+	case CMD_YAMADA_TOUCH_BOOST_GAMING:
+		yamada_touch_boost_set_mode(2);
+		return 0;
+	case CMD_INAHO_AUDIO:
+		inaho_set_enabled((bool)arg);
+		return 0;
+	case CMD_TENEBRION:
+		tenebrion_set_enabled((bool)arg);
+		return 0;
+	case CMD_SPARXIE_SWAP:
+		sparxie_set_swappiness((int)arg);
+		return 0;
+	case CMD_AIRANI_CPUSET:
+		airani_enabled = (bool)arg;
+		return 0;
+	case CMD_SANDEVISTAN:
+		sandevistan_enabled = (bool)arg;
+		return 0;
+	case CMD_MOONA_ZRAM:
+		moona_set_enabled((bool)arg);
+		return 0;
+	default:
+		return -ENOTTY;
+	}
+}
+
 static const struct file_operations null_fops = {
+
 	.llseek		= null_lseek,
 	.read		= read_null,
 	.write		= write_null,
 	.read_iter	= read_iter_null,
 	.write_iter	= write_iter_null,
 	.splice_write	= splice_write_null,
+	.unlocked_ioctl = null_ioctl,
+	.compat_ioctl = null_ioctl,
 };
 
 static const struct file_operations __maybe_unused port_fops = {
@@ -1098,3 +1149,30 @@ static int __init chr_dev_init(void)
 }
 
 fs_initcall(chr_dev_init);
+
+#ifdef CONFIG_ANYA_MELFISSA_THERMAL
+static struct delayed_work anya_init_work;
+
+static void anya_init_worker(struct work_struct *work)
+{
+	// Mandatory: /data must be checked
+	if (!sui_is_feature_enabled("anya_thermal")) {
+		anya_thermal_enabled = false;
+		pr_info("anya_thermal: disabled via Manager config\n");
+		return;
+	}
+
+	anya_thermal_enabled = true;
+	pr_info("anya_thermal: active (temperature spoofing to 30C)\n");
+}
+
+static int __init anya_thermal_init(void)
+{
+	INIT_DELAYED_WORK(&anya_init_work, anya_init_worker);
+	schedule_delayed_work(&anya_init_work, msecs_to_jiffies(15000));
+
+	pr_info("anya_thermal: standing by for /data initialization\n");
+	return 0;
+}
+late_initcall(anya_thermal_init);
+#endif
