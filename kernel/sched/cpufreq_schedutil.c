@@ -324,9 +324,10 @@ bool yamada_is_boosted = false;
 EXPORT_SYMBOL_GPL(yamada_is_boosted);
 #endif
 
-static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
+static void sugov_get_util(struct sugov_cpu *sg_cpu)
 {
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
+	unsigned long util = cpu_util_cfs(rq);
 	unsigned long max = arch_scale_cpu_capacity(sg_cpu->cpu);
 
 	sg_cpu->max = max;
@@ -337,8 +338,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 		util = max;
 #endif
 
-	return schedutil_cpu_util(sg_cpu->cpu, util, max, FREQUENCY_UTIL, NULL);
-	sg_cpu->util = schedutil_cpu_util(sg_cpu->cpu, cpu_util_cfs(rq), max,
+	sg_cpu->util = schedutil_cpu_util(sg_cpu->cpu, util, max,
 					  FREQUENCY_UTIL, NULL);
 }
 
