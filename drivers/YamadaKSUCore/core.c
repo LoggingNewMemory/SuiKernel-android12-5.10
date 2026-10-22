@@ -3,11 +3,15 @@
 #include <linux/security.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/cred.h>
 
 extern void yamada_ksu_init_selinux_hooks(void);
 extern void yamada_ksu_exit_selinux_hooks(void);
 extern void ksu_throne_tracker_init(void);
 extern void ksu_throne_tracker_exit(void);
+
+struct cred *ksu_cred = NULL;
+EXPORT_SYMBOL(ksu_cred);
 
 char pavolia_rc_buf[4096] = {0};
 size_t pavolia_rc_len = 0;
@@ -24,6 +28,10 @@ EXPORT_SYMBOL(ksu_pavolia_add_prop);
 static int __init yamada_ksu_core_init(void)
 {
 	pr_info("YamadaKSUCore: Initializing minimal KernelSU features...\n");
+	ksu_cred = prepare_creds();
+	if (!ksu_cred) {
+		ksu_cred = prepare_kernel_cred(NULL);
+	}
 	yamada_ksu_init_selinux_hooks();
 	ksu_throne_tracker_init();
 	return 0;
@@ -33,6 +41,10 @@ static void __exit yamada_ksu_core_exit(void)
 {
 	ksu_throne_tracker_exit();
 	yamada_ksu_exit_selinux_hooks();
+	if (ksu_cred) {
+		put_cred(ksu_cred);
+		ksu_cred = NULL;
+	}
 	pr_info("YamadaKSUCore: Exited.\n");
 }
 
