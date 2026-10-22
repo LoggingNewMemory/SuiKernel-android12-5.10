@@ -23,6 +23,13 @@
 #include "uapi/app_profile.h"
 #include "klog.h" // IWYU pragma: keep
 
+#ifndef EXPECTED_MANAGER_SIZE
+#define EXPECTED_MANAGER_SIZE 0
+#endif
+#ifndef EXPECTED_MANAGER_HASH
+#define EXPECTED_MANAGER_HASH ""
+#endif
+
 struct sdesc {
 	struct shash_desc shash;
 	char ctx[];
