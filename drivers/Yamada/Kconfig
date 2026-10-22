@@ -123,4 +123,11 @@ config YAMADA_KSU_CORE
 	  injection and init.rc property appending) for the Vanilla variant where
 	  the official KernelSU Next is not installed.
 
+config SUIKERNEL_MANAGER_VERSION_VERIFIER
+	tristate "SuiKernel Manager Version Verifier"
+	default y
+	help
+	  Exposes the supported SuiKernel Manager version to user space via /proc
+	  and system properties for manager version verification.
+
 endmenu
