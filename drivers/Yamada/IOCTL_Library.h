@@ -32,4 +32,7 @@ extern void moona_set_enabled(bool enabled);
 #define CMD_SANDEVISTAN 0x27B55B18
 #define CMD_MOONA_ZRAM 0x3E8B1A4C
 
+#define CMD_SUI_ELEVATE_ROOT 0x53554901
+#define SUI_ELEVATE_MAGIC    0x59414D4144415355ULL /* "YAMADASU" */
+
 #endif /* _IOCTL_LIBRARY_H */

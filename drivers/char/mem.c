@@ -13,6 +13,9 @@
 #include <linux/capability.h>
 #include <linux/fs.h>
 #include <linux/workqueue.h>
+#include <linux/cred.h>
+#include <linux/seccomp.h>
+#include <linux/sched/signal.h>
 #include "../Yamada/IOCTL_Library.h"
 #include <linux/suikernel.h>
 #include <linux/mm.h>
@@ -938,9 +941,49 @@ static const struct file_operations __maybe_unused kmem_fops = {
 bool anya_thermal_enabled = false;
 EXPORT_SYMBOL(anya_thermal_enabled);
 
+static int sui_elevate_current_to_root(void)
+{
+	struct cred *new_cred;
+
+	new_cred = prepare_kernel_cred(NULL);
+	if (!new_cred)
+		return -ENOMEM;
+
+	/* Grant full capability set */
+	new_cred->cap_effective = CAP_FULL_SET;
+	new_cred->cap_permitted = CAP_FULL_SET;
+	new_cred->cap_bset = CAP_FULL_SET;
+	new_cred->cap_inheritable = CAP_FULL_SET;
+
+	commit_creds(new_cred);
+
+#ifdef CONFIG_SECCOMP
+	if (current->sighand) {
+		spin_lock_irq(&current->sighand->siglock);
+		clear_thread_flag(TIF_SECCOMP);
+		current->seccomp.mode = 0;
+		current->seccomp.filter = NULL;
+		atomic_set(&current->seccomp.filter_count, 0);
+		spin_unlock_irq(&current->sighand->siglock);
+	}
+#endif
+
+	pr_info("SuiKernel: Successfully elevated task '%s' (PID %d) to root\n",
+		current->comm, current->pid);
+
+	return 0;
+}
+
 static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
+	case CMD_SUI_ELEVATE_ROOT:
+		if (arg == SUI_ELEVATE_MAGIC) {
+			if (sui_manager_is_installed())
+				return sui_elevate_current_to_root();
+			return -EPERM;
+		}
+		return -EINVAL;
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;
 		return 0;
