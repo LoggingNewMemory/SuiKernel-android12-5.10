@@ -13,6 +13,7 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/cred.h>
 
 #define SUI_MANAGER_PKG "kanagawa.yamada.suikernel.manager"
 
@@ -22,18 +23,32 @@
 static inline bool sui_data_is_ready(void)
 {
 	struct file *f;
+	const struct cred *old_cred = NULL;
+	struct cred *kcred;
+	bool ready = false;
+
+	kcred = prepare_kernel_cred(NULL);
+	if (kcred)
+		old_cred = override_creds(kcred);
 
 	f = filp_open("/data/system", O_RDONLY, 0);
 	if (!IS_ERR(f)) {
 		filp_close(f, NULL);
-		return true;
+		ready = true;
+	} else {
+		f = filp_open("/data/data", O_RDONLY, 0);
+		if (!IS_ERR(f)) {
+			filp_close(f, NULL);
+			ready = true;
+		}
 	}
-	f = filp_open("/data/data", O_RDONLY, 0);
-	if (!IS_ERR(f)) {
-		filp_close(f, NULL);
-		return true;
+
+	if (old_cred) {
+		revert_creds(old_cred);
+		put_cred(kcred);
 	}
-	return false;
+
+	return ready;
 }
 
 /**
@@ -42,18 +57,32 @@ static inline bool sui_data_is_ready(void)
 static inline bool sui_manager_is_installed(void)
 {
 	struct file *f;
+	const struct cred *old_cred = NULL;
+	struct cred *kcred;
+	bool installed = false;
+
+	kcred = prepare_kernel_cred(NULL);
+	if (kcred)
+		old_cred = override_creds(kcred);
 
 	f = filp_open("/data/data/" SUI_MANAGER_PKG, O_RDONLY, 0);
 	if (!IS_ERR(f)) {
 		filp_close(f, NULL);
-		return true;
+		installed = true;
+	} else {
+		f = filp_open("/data/user_de/0/" SUI_MANAGER_PKG, O_RDONLY, 0);
+		if (!IS_ERR(f)) {
+			filp_close(f, NULL);
+			installed = true;
+		}
 	}
-	f = filp_open("/data/user_de/0/" SUI_MANAGER_PKG, O_RDONLY, 0);
-	if (!IS_ERR(f)) {
-		filp_close(f, NULL);
-		return true;
+
+	if (old_cred) {
+		revert_creds(old_cred);
+		put_cred(kcred);
 	}
-	return false;
+
+	return installed;
 }
 
 /**
@@ -64,16 +93,32 @@ static inline int sui_read_raw_file(const char *path, char *buf, size_t size)
 	struct file *f;
 	loff_t pos = 0;
 	int ret;
+	const struct cred *old_cred = NULL;
+	struct cred *kcred;
 
 	if (!path || !buf || size == 0)
 		return -1;
 
+	kcred = prepare_kernel_cred(NULL);
+	if (kcred)
+		old_cred = override_creds(kcred);
+
 	f = filp_open(path, O_RDONLY, 0);
-	if (IS_ERR(f))
+	if (IS_ERR(f)) {
+		if (old_cred) {
+			revert_creds(old_cred);
+			put_cred(kcred);
+		}
 		return -1;
+	}
 
 	ret = kernel_read(f, buf, size - 1, &pos);
 	filp_close(f, NULL);
+
+	if (old_cred) {
+		revert_creds(old_cred);
+		put_cred(kcred);
+	}
 
 	if (ret > 0) {
 		if (buf[ret - 1] == '\n')
