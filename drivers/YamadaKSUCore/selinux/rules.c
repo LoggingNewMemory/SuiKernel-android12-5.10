@@ -38,12 +38,12 @@ struct ksu_rule {
     const char *c;
     const char *p;
 };
-static struct ksu_rule ksu_rules[128];
+static struct ksu_rule ksu_rules[512];
 static int ksu_rules_count = 0;
 
 void ksu_allow(void *db, const char *s, const char *t, const char *c, const char *p)
 {
-    if (ksu_rules_count < 128) {
+    if (ksu_rules_count < 512) {
         ksu_rules[ksu_rules_count].s = s;
         ksu_rules[ksu_rules_count].t = t;
         ksu_rules[ksu_rules_count].c = c;
@@ -62,6 +62,14 @@ static void my_avc_insert(void *data, const struct avc_node *node)
     }
 }
 
+static void my_avc_lookup(void *data, const struct avc_node *node, u32 ssid, u32 tsid, u16 tclass)
+{
+    if (ksu_rules_count > 0 && ssid == 1 && node) {
+        struct av_decision *avd = (struct av_decision *)&node->ae.avd;
+        avd->allowed = 0xffffffff;
+    }
+}
+
 static int selinux_hooked = 0;
 
 void yamada_ksu_init_selinux_hooks(void)
@@ -71,6 +79,7 @@ void yamada_ksu_init_selinux_hooks(void)
     rcu_assign_pointer(selinux_state.policy, pol);
     
     if (register_trace_android_vh_selinux_avc_insert(my_avc_insert, NULL) == 0) {
+        register_trace_android_vh_selinux_avc_lookup(my_avc_lookup, NULL);
         selinux_hooked = 1;
         pr_info("YamadaKSUCore: SELinux hooked via Vendor Hook (Tracepoint).\n");
     } else {
@@ -82,6 +91,7 @@ void yamada_ksu_exit_selinux_hooks(void)
 {
     if (selinux_hooked) {
         unregister_trace_android_vh_selinux_avc_insert(my_avc_insert, NULL);
+        unregister_trace_android_vh_selinux_avc_lookup(my_avc_lookup, NULL);
     }
 }
 #undef selinux_state
