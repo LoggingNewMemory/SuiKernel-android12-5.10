@@ -17,6 +17,9 @@
 
 #define SUI_MANAGER_PKG "kanagawa.yamada.suikernel.manager"
 
+#define CMD_SUI_ELEVATE_ROOT 0x53554901
+#define SUI_ELEVATE_MAGIC    0x59414D4144415355ULL /* "YAMADASU" */
+
 /**
  * sui_data_is_ready - Check if /data filesystem is mounted and accessible
  */
