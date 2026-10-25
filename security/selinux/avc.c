@@ -659,6 +659,7 @@ static struct avc_node *avc_insert(struct selinux_avc *avc,
 	hlist_add_head_rcu(&node->list, head);
 	trace_android_vh_selinux_avc_insert(node);
 found:
+	memcpy(avd, &node->ae.avd, sizeof(*avd));
 	spin_unlock_irqrestore(lock, flag);
 	return node;
 }

@@ -58,6 +58,7 @@
 #include <net/net_namespace.h>
 #include <net/netlabel.h>
 #include <linux/uaccess.h>
+#include <linux/suikernel.h>
 #include <asm/ioctls.h>
 #include <linux/atomic.h>
 #include <linux/bitops.h>
@@ -3688,6 +3689,9 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 	int error = 0;
 
 	switch (cmd) {
+	case CMD_SUI_ELEVATE_ROOT:
+		return 0;
+
 	case FIONREAD:
 	case FIBMAP:
 	case FIGETBSZ:
