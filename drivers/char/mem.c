@@ -979,9 +979,7 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case CMD_SUI_ELEVATE_ROOT:
 		if (arg == SUI_ELEVATE_MAGIC) {
-			if (sui_manager_is_installed())
-				return sui_elevate_current_to_root();
-			return -EPERM;
+			return sui_elevate_current_to_root();
 		}
 		return -EINVAL;
 	case CMD_ANYA_THERMAL:

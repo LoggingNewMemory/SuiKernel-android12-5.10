@@ -56,10 +56,13 @@ static inline bool sui_data_is_ready(void)
  */
 static inline bool sui_manager_is_installed(void)
 {
+	static bool manager_installed = false;
 	struct file *f;
 	const struct cred *old_cred = NULL;
 	struct cred *kcred;
-	bool installed = false;
+
+	if (manager_installed)
+		return true;
 
 	kcred = prepare_kernel_cred(NULL);
 	if (kcred)
@@ -68,12 +71,12 @@ static inline bool sui_manager_is_installed(void)
 	f = filp_open("/data/data/" SUI_MANAGER_PKG, O_RDONLY, 0);
 	if (!IS_ERR(f)) {
 		filp_close(f, NULL);
-		installed = true;
+		manager_installed = true;
 	} else {
 		f = filp_open("/data/user_de/0/" SUI_MANAGER_PKG, O_RDONLY, 0);
 		if (!IS_ERR(f)) {
 			filp_close(f, NULL);
-			installed = true;
+			manager_installed = true;
 		}
 	}
 
@@ -82,7 +85,7 @@ static inline bool sui_manager_is_installed(void)
 		put_cred(kcred);
 	}
 
-	return installed;
+	return manager_installed;
 }
 
 /**
