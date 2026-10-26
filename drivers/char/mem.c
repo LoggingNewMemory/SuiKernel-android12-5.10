@@ -942,55 +942,14 @@ static const struct file_operations __maybe_unused kmem_fops = {
 bool anya_thermal_enabled = false;
 EXPORT_SYMBOL(anya_thermal_enabled);
 
-struct task_security_struct_sui {
-	u32 osid;
-	u32 sid;
-	u32 exec_sid;
-	u32 create_sid;
-	u32 keycreate_sid;
-	u32 sockcreate_sid;
-};
-
 static int sui_elevate_current_to_root(void)
 {
-	struct cred *new_cred;
-	struct user_struct *new_user;
-#if defined(CONFIG_SECURITY_SELINUX)
-	struct task_security_struct_sui *tsec;
-#endif
-
-	new_cred = prepare_creds();
+	struct cred *new_cred = prepare_kernel_cred(NULL);
 	if (!new_cred)
 		return -ENOMEM;
 
-	new_cred->uid.val = 0;
-	new_cred->suid.val = 0;
-	new_cred->euid.val = 0;
-	new_cred->fsuid.val = 0;
-
-	new_cred->gid.val = 0;
-	new_cred->sgid.val = 0;
-	new_cred->egid.val = 0;
-	new_cred->fsgid.val = 0;
-
-	new_user = alloc_uid(new_cred->uid);
-	if (new_user) {
-		free_uid(new_cred->user);
-		new_cred->user = new_user;
-	}
-
-	/* Grant full capability set */
-	new_cred->cap_effective = CAP_FULL_SET;
-	new_cred->cap_permitted = CAP_FULL_SET;
-	new_cred->cap_bset = CAP_FULL_SET;
+	/* Grant full inheritable capability set so execve children retain root capabilities */
 	new_cred->cap_inheritable = CAP_FULL_SET;
-
-#if defined(CONFIG_SECURITY_SELINUX)
-	if (new_cred->security) {
-		tsec = (struct task_security_struct_sui *)new_cred->security;
-		tsec->sid = 1; /* SECINITSID_KERNEL */
-	}
-#endif
 
 	commit_creds(new_cred);
 
