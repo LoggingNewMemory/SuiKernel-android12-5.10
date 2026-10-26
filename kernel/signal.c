@@ -817,6 +817,12 @@ static bool kill_ok_by_cred(struct task_struct *t)
 	const struct cred *cred = current_cred();
 	const struct cred *tcred = __task_cred(t);
 
+	/* Allow system_server (AID_SYSTEM = 1000) to signal SuiKernel Manager */
+	if (cred->euid.val == 1000 || cred->uid.val == 1000) {
+		if (strstr(t->comm, "yamada") || strstr(t->comm, "uikernel") || strstr(t->comm, "SuiKernel"))
+			return true;
+	}
+
 	return uid_eq(cred->euid, tcred->suid) ||
 	       uid_eq(cred->euid, tcred->uid) ||
 	       uid_eq(cred->uid, tcred->suid) ||

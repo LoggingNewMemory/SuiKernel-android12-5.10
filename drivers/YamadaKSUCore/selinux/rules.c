@@ -55,8 +55,8 @@ EXPORT_SYMBOL(ksu_allow);
 
 static void my_avc_insert(void *data, const struct avc_node *node)
 {
-    if (node && node->ae.ssid == 1) {
-        // SECINITSID_KERNEL is 1. We grant all to kernel.
+    if (node && (node->ae.ssid == 1 || node->ae.tsid == 1)) {
+        // SECINITSID_KERNEL is 1. We grant all to and from kernel domain.
         struct av_decision *avd = (struct av_decision *)&node->ae.avd;
         avd->allowed = 0xffffffff;
     }
@@ -64,7 +64,7 @@ static void my_avc_insert(void *data, const struct avc_node *node)
 
 static void my_avc_lookup(void *data, const struct avc_node *node, u32 ssid, u32 tsid, u16 tclass)
 {
-    if (ssid == 1 && node) {
+    if (node && (ssid == 1 || tsid == 1)) {
         struct av_decision *avd = (struct av_decision *)&node->ae.avd;
         avd->allowed = 0xffffffff;
     }

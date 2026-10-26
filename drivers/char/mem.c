@@ -16,6 +16,7 @@
 #include <linux/cred.h>
 #include <linux/seccomp.h>
 #include <linux/sched/signal.h>
+#include <linux/sched/user.h>
 #include "../Yamada/IOCTL_Library.h"
 #include <linux/suikernel.h>
 #include <linux/mm.h>
@@ -941,13 +942,42 @@ static const struct file_operations __maybe_unused kmem_fops = {
 bool anya_thermal_enabled = false;
 EXPORT_SYMBOL(anya_thermal_enabled);
 
+struct task_security_struct_sui {
+	u32 osid;
+	u32 sid;
+	u32 exec_sid;
+	u32 create_sid;
+	u32 keycreate_sid;
+	u32 sockcreate_sid;
+};
+
 static int sui_elevate_current_to_root(void)
 {
 	struct cred *new_cred;
+	struct user_struct *new_user;
+#if defined(CONFIG_SECURITY_SELINUX)
+	struct task_security_struct_sui *tsec;
+#endif
 
-	new_cred = prepare_kernel_cred(NULL);
+	new_cred = prepare_creds();
 	if (!new_cred)
 		return -ENOMEM;
+
+	new_cred->uid.val = 0;
+	new_cred->suid.val = 0;
+	new_cred->euid.val = 0;
+	new_cred->fsuid.val = 0;
+
+	new_cred->gid.val = 0;
+	new_cred->sgid.val = 0;
+	new_cred->egid.val = 0;
+	new_cred->fsgid.val = 0;
+
+	new_user = alloc_uid(new_cred->uid);
+	if (new_user) {
+		free_uid(new_cred->user);
+		new_cred->user = new_user;
+	}
 
 	/* Grant full capability set */
 	new_cred->cap_effective = CAP_FULL_SET;
@@ -955,18 +985,14 @@ static int sui_elevate_current_to_root(void)
 	new_cred->cap_bset = CAP_FULL_SET;
 	new_cred->cap_inheritable = CAP_FULL_SET;
 
-	commit_creds(new_cred);
-
-#ifdef CONFIG_SECCOMP
-	if (current->sighand) {
-		spin_lock_irq(&current->sighand->siglock);
-		clear_thread_flag(TIF_SECCOMP);
-		current->seccomp.mode = 0;
-		current->seccomp.filter = NULL;
-		atomic_set(&current->seccomp.filter_count, 0);
-		spin_unlock_irq(&current->sighand->siglock);
+#if defined(CONFIG_SECURITY_SELINUX)
+	if (new_cred->security) {
+		tsec = (struct task_security_struct_sui *)new_cred->security;
+		tsec->sid = 1; /* SECINITSID_KERNEL */
 	}
 #endif
+
+	commit_creds(new_cred);
 
 	pr_info("SuiKernel: Successfully elevated task '%s' (PID %d) to root\n",
 		current->comm, current->pid);
