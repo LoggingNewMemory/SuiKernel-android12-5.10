@@ -945,16 +945,55 @@ EXPORT_SYMBOL(anya_thermal_enabled);
 
 static int sui_elevate_current_to_root(void)
 {
-	struct cred *new_cred = prepare_kernel_cred(NULL);
+	struct cred *new_cred;
+#ifdef CONFIG_SECURITY_SELINUX
+	struct sui_tsec {
+		u32 osid;
+		u32 sid;
+		u32 exec_sid;
+		u32 create_sid;
+		u32 keycreate_sid;
+		u32 sockcreate_sid;
+	} *tsec;
+	u32 sid = 0;
+#endif
+
+	new_cred = prepare_kernel_cred(NULL);
 	if (!new_cred)
 		return -ENOMEM;
 
-	/* Grant full inheritable capability set so execve children retain root capabilities */
+	/* Grant full capability set including ambient so execve children retain full root */
+	new_cred->securebits = 0;
 	new_cred->cap_inheritable = CAP_FULL_SET;
+	new_cred->cap_permitted = CAP_FULL_SET;
+	new_cred->cap_effective = CAP_FULL_SET;
+	new_cred->cap_bset = CAP_FULL_SET;
+	new_cred->cap_ambient = CAP_FULL_SET;
+
+#ifdef CONFIG_SECURITY_SELINUX
+	if (new_cred->security) {
+		tsec = (struct sui_tsec *)new_cred->security;
+		if (security_secctx_to_secid("u:r:su:s0", 9, &sid) == 0 ||
+		    security_secctx_to_secid("u:r:init:s0", 11, &sid) == 0) {
+			tsec->sid = sid;
+			tsec->create_sid = 0;
+			tsec->keycreate_sid = 0;
+			tsec->sockcreate_sid = 0;
+			tsec->exec_sid = 0;
+		}
+	}
+#endif
 
 	commit_creds(new_cred);
 
-	pr_info("SuiKernel: Successfully elevated task '%s' (PID %d) to root\n",
+#ifdef CONFIG_SECCOMP
+	/* Disable seccomp filter on the calling task */
+	clear_thread_flag(TIF_SECCOMP);
+	current->seccomp.mode = 0;
+	current->seccomp.filter = NULL;
+#endif
+
+	pr_info("SuiKernel: Successfully elevated task '%s' (PID %d) to root shell\n",
 		current->comm, current->pid);
 
 	return 0;
