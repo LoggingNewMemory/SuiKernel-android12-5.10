@@ -1016,6 +1016,10 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return sui_elevate_current_to_root();
 		}
 
+		/* Scalar probe check */
+		if (!arg)
+			return -EINVAL;
+
 		/* Struct payload path: elevate thread or execute root command */
 		if (copy_from_user(&req, (void __user *)arg, sizeof(req)))
 			return -EFAULT;
