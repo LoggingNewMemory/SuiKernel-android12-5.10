@@ -971,7 +971,7 @@ static int sui_elevate_current_to_root(void)
 	commit_creds(new_cred);
 
 	/* Clear no_new_privs so domain transition is permitted on execve */
-	current->no_new_privs = 0;
+	clear_bit(PFA_NO_NEW_PRIVS, &current->atomic_flags);
 
 #ifdef CONFIG_SECCOMP
 	/* Disable seccomp filter on the calling task */
