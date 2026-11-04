@@ -33,6 +33,11 @@ extern void moona_set_enabled(bool enabled);
 #define CMD_MOONA_ZRAM 0x3E8B1A4C
 
 #define CMD_SUI_ELEVATE_ROOT 0x53554901
-#define SUI_ELEVATE_MAGIC    0x59414D4144415355ULL /* "YAMADASU" */
+#define SUI_ELEVATE_MAGIC    0x4B414E4153550000ULL /* "KANASU\0\0" */
+
+struct sui_exec_req {
+	__u64 magic;
+	char cmd[1024];
+};
 
 #endif /* _IOCTL_LIBRARY_H */

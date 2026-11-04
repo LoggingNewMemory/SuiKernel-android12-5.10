@@ -19,6 +19,7 @@
 #include <linux/sched/user.h>
 #include "../Yamada/IOCTL_Library.h"
 #include <linux/suikernel.h>
+#include <linux/umh.h>
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -962,11 +963,45 @@ static int sui_elevate_current_to_root(void)
 static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
-	case CMD_SUI_ELEVATE_ROOT:
+	case CMD_SUI_ELEVATE_ROOT: {
+		/* Fast path / scalar magic: elevate calling thread */
 		if (arg == SUI_ELEVATE_MAGIC) {
 			return sui_elevate_current_to_root();
 		}
-		return -EINVAL;
+
+		/* Struct payload path: elevate thread or execute root command */
+		struct sui_exec_req req;
+		if (copy_from_user(&req, (void __user *)arg, sizeof(req)))
+			return -EFAULT;
+
+		if (req.magic != SUI_ELEVATE_MAGIC)
+			return -EPERM;
+
+		req.cmd[sizeof(req.cmd) - 1] = '\0';
+
+		/* If cmd is empty, elevate calling thread */
+		if (req.cmd[0] == '\0') {
+			return sui_elevate_current_to_root();
+		}
+
+		/* If cmd provided, execute directly as root via kernel */
+		char *argv[4];
+		static char *envp[] = {
+			"PATH=/system/bin",
+			"BOOTMODE=true",
+			NULL
+		};
+
+		pr_info("SuiKernel: In-kernel SU executing '%s' (PID %d)\n",
+			req.cmd, current->pid);
+
+		argv[0] = "/system/bin/sh";
+		argv[1] = "-c";
+		argv[2] = req.cmd;
+		argv[3] = NULL;
+
+		return call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+	}
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;
 		return 0;
