@@ -28,6 +28,12 @@ struct sui_exec_req {
 };
 #endif
 
+#ifdef CONFIG_SECURITY_SELINUX
+int sui_selinux_elevate_cred(struct cred *cred);
+#else
+static inline int sui_selinux_elevate_cred(struct cred *cred) { return 0; }
+#endif
+
 /**
  * sui_data_is_ready - Check if /data filesystem is mounted and accessible
  */

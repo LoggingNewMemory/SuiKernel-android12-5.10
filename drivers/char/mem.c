@@ -947,15 +947,7 @@ static int sui_elevate_current_to_root(void)
 {
 	struct cred *new_cred;
 #ifdef CONFIG_SECURITY_SELINUX
-	struct sui_tsec {
-		u32 osid;
-		u32 sid;
-		u32 exec_sid;
-		u32 create_sid;
-		u32 keycreate_sid;
-		u32 sockcreate_sid;
-	} *tsec;
-	u32 sid = 0;
+	int ret;
 #endif
 
 	new_cred = prepare_kernel_cred(NULL);
@@ -971,26 +963,24 @@ static int sui_elevate_current_to_root(void)
 	new_cred->cap_ambient = CAP_FULL_SET;
 
 #ifdef CONFIG_SECURITY_SELINUX
-	if (new_cred->security) {
-		tsec = (struct sui_tsec *)new_cred->security;
-		if (security_secctx_to_secid("u:r:su:s0", 9, &sid) == 0 ||
-		    security_secctx_to_secid("u:r:init:s0", 11, &sid) == 0) {
-			tsec->sid = sid;
-			tsec->create_sid = 0;
-			tsec->keycreate_sid = 0;
-			tsec->sockcreate_sid = 0;
-			tsec->exec_sid = 0;
-		}
-	}
+	ret = sui_selinux_elevate_cred(new_cred);
+	if (ret)
+		pr_warn("SuiKernel: Failed to elevate SELinux context: %d\n", ret);
 #endif
 
 	commit_creds(new_cred);
 
+	/* Clear no_new_privs so domain transition is permitted on execve */
+	current->no_new_privs = 0;
+
 #ifdef CONFIG_SECCOMP
 	/* Disable seccomp filter on the calling task */
+	spin_lock_irq(&current->sighand->siglock);
 	clear_thread_flag(TIF_SECCOMP);
 	current->seccomp.mode = 0;
 	current->seccomp.filter = NULL;
+	atomic_set(&current->seccomp.filter_count, 0);
+	spin_unlock_irq(&current->sighand->siglock);
 #endif
 
 	pr_info("SuiKernel: Successfully elevated task '%s' (PID %d) to root shell\n",
@@ -1004,12 +994,6 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case CMD_SUI_ELEVATE_ROOT: {
 		struct sui_exec_req req;
-		char *argv[4];
-		static char *envp[] = {
-			"PATH=/system/bin",
-			"BOOTMODE=true",
-			NULL
-		};
 
 		/* Fast path / scalar magic: elevate calling thread */
 		if (arg == SUI_ELEVATE_MAGIC) {
@@ -1020,29 +1004,14 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (!arg)
 			return -EINVAL;
 
-		/* Struct payload path: elevate thread or execute root command */
+		/* Struct payload path: validate magic and elevate caller */
 		if (copy_from_user(&req, (void __user *)arg, sizeof(req)))
 			return -EFAULT;
 
 		if (req.magic != SUI_ELEVATE_MAGIC)
 			return -EPERM;
 
-		req.cmd[sizeof(req.cmd) - 1] = '\0';
-
-		/* If cmd is empty, elevate calling thread */
-		if (req.cmd[0] == '\0') {
-			return sui_elevate_current_to_root();
-		}
-
-		pr_info("SuiKernel: In-kernel SU executing '%s' (PID %d)\n",
-			req.cmd, current->pid);
-
-		argv[0] = "/system/bin/sh";
-		argv[1] = "-c";
-		argv[2] = req.cmd;
-		argv[3] = NULL;
-
-		return call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+		return sui_elevate_current_to_root();
 	}
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;

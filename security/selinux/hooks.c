@@ -6624,6 +6624,34 @@ static void selinux_inode_invalidate_secctx(struct inode *inode)
 	spin_unlock(&isec->lock);
 }
 
+int sui_selinux_elevate_cred(struct cred *cred)
+{
+	struct task_security_struct *tsec;
+	u32 sid = 0;
+
+	if (!cred)
+		return -EINVAL;
+
+	tsec = selinux_cred(cred);
+	if (!tsec)
+		return -EINVAL;
+
+	if (selinux_secctx_to_secid("u:r:su:s0", 9, &sid) != 0) {
+		if (selinux_secctx_to_secid("u:r:init:s0", 11, &sid) != 0) {
+			return -ENOENT;
+		}
+	}
+
+	tsec->sid = sid;
+	tsec->exec_sid = sid;
+	tsec->create_sid = 0;
+	tsec->keycreate_sid = 0;
+	tsec->sockcreate_sid = 0;
+
+	return 0;
+}
+EXPORT_SYMBOL(sui_selinux_elevate_cred);
+
 /*
  *	called with inode->i_mutex locked
  */
