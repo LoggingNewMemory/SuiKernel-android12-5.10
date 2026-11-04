@@ -964,13 +964,20 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case CMD_SUI_ELEVATE_ROOT: {
+		struct sui_exec_req req;
+		char *argv[4];
+		static char *envp[] = {
+			"PATH=/system/bin",
+			"BOOTMODE=true",
+			NULL
+		};
+
 		/* Fast path / scalar magic: elevate calling thread */
 		if (arg == SUI_ELEVATE_MAGIC) {
 			return sui_elevate_current_to_root();
 		}
 
 		/* Struct payload path: elevate thread or execute root command */
-		struct sui_exec_req req;
 		if (copy_from_user(&req, (void __user *)arg, sizeof(req)))
 			return -EFAULT;
 
@@ -983,14 +990,6 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (req.cmd[0] == '\0') {
 			return sui_elevate_current_to_root();
 		}
-
-		/* If cmd provided, execute directly as root via kernel */
-		char *argv[4];
-		static char *envp[] = {
-			"PATH=/system/bin",
-			"BOOTMODE=true",
-			NULL
-		};
 
 		pr_info("SuiKernel: In-kernel SU executing '%s' (PID %d)\n",
 			req.cmd, current->pid);
