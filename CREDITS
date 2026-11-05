@@ -4111,6 +4111,28 @@ S: 542 West 112th Street, 5N
 S: New York, New York 10025
 S: USA
 
+N: Kana Wesley Yamada
+E: albert.wesley.dion@gmail.com
+W: https://github.com/LoggingNewMemory
+D: SuiKernel author and maintainer
+D: Custom IOCTL interfaces
+D: Thermal hacks for gaming purposes
+D: GKI 5.10 kernel hacks (with Wildkernels)
+D: Minimum KSU Core implementation for non KernelSU build
+D: Android setprop hack by connecting KernelSU to setprop
+D: Universal & adjustable Touch Boost implementation
+D: Adjustable Swappiness tuner
+D: Adjustable ZRAM tweaks
+D: Schedutil Enforcer
+D: Drops CPUFreq when device is off. Depends of paths that known
+D: Tweaks that can fight with vendor rc, that OEMs sometimes don't care about actual device performance
+D: Temporary performance for a while, while on boot
+D: CPU Affinity & kswapd tweaks
+D: CPUset tweaks
+D: SCHED_FIFO boost + PM QoS tweaks
+S: Semarang
+S: Indonesia
+
 N: Li Yang
 E: leoli@freescale.com
 D: Freescale Highspeed USB device driver
