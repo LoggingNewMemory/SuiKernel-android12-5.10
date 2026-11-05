@@ -27,7 +27,7 @@ EXPORT_SYMBOL(ksu_pavolia_add_prop);
 
 static int __init yamada_ksu_core_init(void)
 {
-	pr_info("YamadaKSUCore: Initializing minimal KernelSU features...\n");
+	pr_info("KanaKSUCore: Initializing minimal KernelSU features...\n");
 	ksu_cred = prepare_creds();
 	if (!ksu_cred) {
 		ksu_cred = prepare_kernel_cred(NULL);
@@ -45,7 +45,7 @@ static void __exit yamada_ksu_core_exit(void)
 		put_cred(ksu_cred);
 		ksu_cred = NULL;
 	}
-	pr_info("YamadaKSUCore: Exited.\n");
+	pr_info("KanaKSUCore: Exited.\n");
 }
 
 module_init(yamada_ksu_core_init);
@@ -53,4 +53,4 @@ module_exit(yamada_ksu_core_exit);
 
 MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kana Wesley Yamada");
-MODULE_DESCRIPTION("Yamada Minimal KernelSU Core");
+MODULE_DESCRIPTION("Kana Minimal KernelSU Core");

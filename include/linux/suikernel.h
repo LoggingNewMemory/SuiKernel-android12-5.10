@@ -216,7 +216,7 @@ static inline int sui_read_int_config(const char *feature, int default_val, int 
 }
 
 /**
- * sui_get_touch_boost_mode - Get Yamada Touch Boost mode (0=off, 1=balanced, 2=gaming)
+ * sui_get_touch_boost_mode - Get Kana Touch Boost mode (0=off, 1=balanced, 2=gaming)
  */
 static inline int sui_get_touch_boost_mode(void)
 {

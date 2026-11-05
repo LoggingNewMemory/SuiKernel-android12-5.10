@@ -81,9 +81,9 @@ void yamada_ksu_init_selinux_hooks(void)
     if (register_trace_android_vh_selinux_avc_insert(my_avc_insert, NULL) == 0) {
         register_trace_android_vh_selinux_avc_lookup(my_avc_lookup, NULL);
         selinux_hooked = 1;
-        pr_info("YamadaKSUCore: SELinux hooked via Vendor Hook (Tracepoint).\n");
+        pr_info("KanaKSUCore: SELinux hooked via Vendor Hook (Tracepoint).\n");
     } else {
-        pr_err("YamadaKSUCore: Failed to hook SELinux!\n");
+        pr_err("KanaKSUCore: Failed to hook SELinux!\n");
     }
 }
 

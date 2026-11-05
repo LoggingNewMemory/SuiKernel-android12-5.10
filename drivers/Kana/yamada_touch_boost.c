@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Yamada Touch Boost — Schedutil Hook Edition
+// Kana Touch Boost — Schedutil Hook Edition
 // Author: Kana Wesley Yamada
 
 #include <linux/module.h>
@@ -97,4 +97,4 @@ module_exit(yamada_touch_boost_exit);
 
 MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kana Wesley Yamada");
-MODULE_DESCRIPTION("Yamada Touch Boost — Schedutil Direct Hook Edition");
+MODULE_DESCRIPTION("Kana Touch Boost — Schedutil Direct Hook Edition");

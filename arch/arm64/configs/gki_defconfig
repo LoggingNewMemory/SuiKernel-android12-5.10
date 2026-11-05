@@ -700,7 +700,7 @@ CONFIG_HIST_TRIGGERS=y
 CONFIG_FUNCTION_ERROR_INJECTION=y
 # CONFIG_RUNTIME_TESTING_MENU is not set
 ###############################
-# Yamada Line
+# Kana Line
 ###############################
 
 # BBR
@@ -746,7 +746,7 @@ CONFIG_ZRAM_DEF_COMP_LZ4=y
 CONFIG_ZSWAP=n
 
 ###########################
-# Yamada Special
+# Kana Special
 ###########################
 CONFIG_SANDEVISTAN_BOOT=y
 CONFIG_YAMADA_TOUCH_BOOST=y
@@ -757,7 +757,7 @@ CONFIG_SCHEDUTIL_ENFORCER=y
 CONFIG_YAMADA_DEV_IDENTIFICATION=y
 
 ###########################
-# Yamada Debug Tool 
+# Kana Debug Tool 
 ###########################
 CONFIG_KANAGAWA_PERMISSIVE=n
 

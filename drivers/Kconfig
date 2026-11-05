@@ -236,7 +236,7 @@ source "drivers/counter/Kconfig"
 
 source "drivers/most/Kconfig"
 
-# Yamada Custom Drivers
+# Kana Custom Drivers
 
 source "drivers/Kana/Kconfig"
 endmenu

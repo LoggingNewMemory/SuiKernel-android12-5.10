@@ -10,7 +10,7 @@
 
 static inline void ksu_prune_allowlist(bool (*is_uid_exist)(uid_t, char *, void *), void *data)
 {
-	// No-op for minimal YamadaKSUCore
+	// No-op for minimal KanaKSUCore
 }
 
 #endif
