@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// drivers/misc/Yamada/yamada_dev_identification.c
+// drivers/Kana/yamada_dev_identification.c
 // SuiKernel Developer Identification
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -9,7 +9,7 @@
 
 static int __init yamada_dev_ident_init(void)
 {
-	pavolia_reine_setprop("suikernel.developer.is", "Kanagawa Yamada");
+	pavolia_reine_setprop("suikernel.developer.is", "Kana Wesley Yamada");
 	pavolia_reine_setprop("hoshimachi.suisei", "Stellar Stellar");
 
 	return 0;
@@ -18,5 +18,5 @@ static int __init yamada_dev_ident_init(void)
 module_init(yamada_dev_ident_init);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("SuiKernel Developer Identification");

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Kureiji Ollie Affinity — Kswapd Binder
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/module.h>
 #include <linux/sched.h>
@@ -85,5 +85,5 @@ module_init(kureiji_ollie_init);
 module_exit(kureiji_ollie_exit);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Kureiji Ollie - Modifies kswapd to highest CPU cores");

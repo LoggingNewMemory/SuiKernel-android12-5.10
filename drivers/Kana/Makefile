@@ -1,5 +1,5 @@
 #
-# Makefile for Yamada Custom Android Drivers
+# Makefile for Kana Custom Android Drivers
 #
 
 obj-$(CONFIG_OCHINAI_INAHO) += ochinai_inaho.o

@@ -190,6 +190,6 @@ obj-$(CONFIG_INTERCONNECT)	+= interconnect/
 obj-$(CONFIG_COUNTER)		+= counter/
 obj-$(CONFIG_MOST)		+= most/
 
-# Yamada Custom Drivers
-obj-y		+= Yamada/
-obj-$(CONFIG_YAMADA_KSU_CORE) += YamadaKSUCore/
+# Kana Custom Drivers
+obj-y		+= Kana/
+obj-$(CONFIG_YAMADA_KSU_CORE) += KanaKSUCore/

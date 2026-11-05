@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // drivers/misc/raco_rc_override.c
 // Raco Override — Universal .rc Override API
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -145,5 +145,5 @@ late_initcall(raco_override_init);
 module_exit(raco_override_exit);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Raco Universal RC Override");

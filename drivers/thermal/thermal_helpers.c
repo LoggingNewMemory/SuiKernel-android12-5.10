@@ -80,7 +80,7 @@ EXPORT_SYMBOL(get_thermal_instance);
 
  /*
  Anya Thermal Line
- This one is modified by Kanagawa Yamada to make the Temp spoof to 30
+ This one is modified by Kana Wesley Yamada to make the Temp spoof to 30
  */
 int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 {

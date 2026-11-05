@@ -238,5 +238,5 @@ source "drivers/most/Kconfig"
 
 # Yamada Custom Drivers
 
-source "drivers/Yamada/Kconfig"
+source "drivers/Kana/Kconfig"
 endmenu

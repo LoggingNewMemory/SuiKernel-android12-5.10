@@ -52,5 +52,5 @@ module_init(yamada_ksu_core_init);
 module_exit(yamada_ksu_core_exit);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Yamada Minimal KernelSU Core");

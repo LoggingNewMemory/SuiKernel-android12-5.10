@@ -3,7 +3,7 @@
  * include/linux/suikernel.h
  *
  * SuiKernel Global Manager & Storage Helpers
- * Author: Kanagawa Yamada
+ * Author: Kana Wesley Yamada
  */
 
 #ifndef _LINUX_SUIKERNEL_H

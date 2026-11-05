@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // sparxie_swapiness_tuner.c
 // Sparxie Swappiness Tuner — Delegated to Raco Engine API
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -65,5 +65,5 @@ module_init(sparxie_swap_init);
 module_exit(sparxie_swap_exit);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Sparxie Swappiness Tuner — Hooked to Raco Override Engine");

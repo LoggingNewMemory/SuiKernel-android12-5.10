@@ -2,7 +2,7 @@
 /*
  * include/linux/raco_override.h
  * Raco Universal RC Override API — public header
- * Author: Kanagawa Yamada
+ * Author: Kana Wesley Yamada
  */
 
 #ifndef _RACO_RC_OVERRIDE_H

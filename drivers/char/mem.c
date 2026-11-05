@@ -17,7 +17,7 @@
 #include <linux/seccomp.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/user.h>
-#include "../Yamada/IOCTL_Library.h"
+#include "../Kana/IOCTL_Library.h"
 #include <linux/suikernel.h>
 #include <linux/umh.h>
 #include <linux/mm.h>

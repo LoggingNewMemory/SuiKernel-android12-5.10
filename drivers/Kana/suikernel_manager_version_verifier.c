@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// drivers/Yamada/suikernel_manager_version_verifier.c
+// drivers/Kana/suikernel_manager_version_verifier.c
 // SuiKernel Manager Version Verifier
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -39,5 +39,5 @@ module_init(suikernel_manager_version_init);
 module_exit(suikernel_manager_version_exit);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("SuiKernel Manager Version Verifier");

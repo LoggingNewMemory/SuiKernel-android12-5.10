@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // drivers/misc/schedutil_enforcer.c
 // Schedutil Enforcer, enforce schedutil as default CPU GOV because vendor init.rc overrides it
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/module.h>
 #include <linux/kernel.h>

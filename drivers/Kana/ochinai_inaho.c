@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // ochinai_inaho.c
 // Ochinai Inaho — SCHED_FIFO boost + PM QoS
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/kprobes.h>
 #include <linux/module.h>
@@ -194,5 +194,5 @@ module_init(inaho_audio_enhance_init);
 module_exit(inaho_audio_enhance_exit);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Ochinai Inaho");

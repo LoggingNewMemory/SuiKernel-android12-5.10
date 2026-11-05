@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// drivers/Yamada/moona_hoshinova_zram.c
+// drivers/Kana/moona_hoshinova_zram.c
 // Moona Hoshinova ZRAM Enforcer — forces zstd comp_algorithm
-// Author: Kanagawa Yamada
+// Author: Kana Wesley Yamada
 
 #include <linux/module.h>
 #include <linux/kernel.h>

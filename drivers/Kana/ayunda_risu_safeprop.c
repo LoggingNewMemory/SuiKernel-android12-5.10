@@ -31,5 +31,5 @@ static int __init ayunda_risu_setprop(void)
 module_init(ayunda_risu_setprop);
 
 MODULE_LICENSE("GPL v3");
-MODULE_AUTHOR("Kanagawa Yamada");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Spoof some props for reduced root detection");

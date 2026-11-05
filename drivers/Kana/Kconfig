@@ -1,4 +1,4 @@
-menu "Yamada Custom Android Drivers"
+menu "Kana Custom Android Drivers"
 
 config OCHINAI_INAHO
 	tristate "Ochinai Inaho — SCHED_FIFO + PM QoS tuning"
