@@ -267,7 +267,7 @@ static void search_manager(const char *path, int depth, struct list_head *uid_da
 			if (_last_slash) *_last_slash = '\0';
 
 			if (get_pkg_from_apk_dir_path(_pkg, _dir_path) == 0 &&
-			    strncmp(_pkg, "kanagawa.yamada.suikernel.manager", 33) == 0) {
+			    strncmp(_pkg, "kana.wesley.yamada.suikernel.manager", 36) == 0) {
 				crown_sui_manager(candidate_path, uid_data);
 			} else {
 				crown_manager(candidate_path, uid_data);

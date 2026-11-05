@@ -15,7 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/cred.h>
 
-#define SUI_MANAGER_PKG "kanagawa.yamada.suikernel.manager"
+#define SUI_MANAGER_PKG "kana.wesley.yamada.suikernel.manager"
 
 #define CMD_SUI_ELEVATE_ROOT 0x53554901
 #define SUI_ELEVATE_MAGIC    0x4B414E4153550000ULL /* "KANASU\0\0" */

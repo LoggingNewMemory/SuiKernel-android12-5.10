@@ -347,7 +347,7 @@ bool is_manager_apk(char *path)
 	if (last_slash) *last_slash = '\0';
 
 	if (get_pkg_from_apk_dir_path(sui_pkg, dir_path) >= 0) {
-		if (strncmp(sui_pkg, "kanagawa.yamada.suikernel.manager", 33) == 0) {
+		if (strncmp(sui_pkg, "kana.wesley.yamada.suikernel.manager", 36) == 0) {
 			pr_info("SuiKernel: Manager detected! Granting native rights.\n");
 			return true;
 		}
