@@ -1,3 +1,16 @@
+// SPDX-License-Identifier: GPL-3.0-only
+/*
+ * KanaKSUCore - Minimal KernelSU Core for SuiKernel (Vanilla)
+ *
+ * Referenced and adapted from KernelSU & KernelSU Next:
+ *   - KernelSU: Copyright (C) 2023 weishu <tiann@tiann.net>
+ *     https://github.com/tiann/KernelSU
+ *   - KernelSU Next: Copyright (C) 2024-2026 KernelSU Next Team / rifsxd
+ *     https://github.com/KernelSU-Next/KernelSU-Next
+ *
+ * Adapted and integrated for SuiKernel by Kana Wesley Yamada
+ */
+
 #include <linux/module.h>
 #include <linux/kprobes.h>
 #include <linux/security.h>

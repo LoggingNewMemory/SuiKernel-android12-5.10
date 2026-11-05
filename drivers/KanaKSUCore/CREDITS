@@ -1,0 +1,32 @@
+KanaKSUCore - Credits & Attribution
+====================================
+
+KanaKSUCore is a minimal KernelSU core driver implemented for the SuiKernel
+Vanilla build variant to provide native SELinux rule hooking (via Android
+Vendor Hook tracepoints) and secondary manager tracking without requiring
+the full standalone KernelSU module.
+
+Most of KanaKSUCore's subsystem architecture, manager identity verification,
+and hook patterns are referenced, adapted, and derived from:
+
+1. KernelSU
+   - Original Creator: weishu <tiann@tiann.net>
+   - Contributors: KernelSU Team and contributors
+   - Repository: https://github.com/tiann/KernelSU
+   - License: GNU General Public License v3.0 (GPL-3.0)
+   - Referenced Components:
+     * manager/apk_sign.c, apk_sign.h (APK v2/v3 signature parsing and manager identification)
+     * manager/throne_tracker.c, throne_tracker.h (Manager tracking and UID registration)
+     * include/ (Internal types, uapi, and helper macros)
+
+2. KernelSU Next
+   - Maintainers: KernelSU Next Team / rifsxd
+   - Repository: https://github.com/KernelSU-Next/KernelSU-Next
+   - License: GNU General Public License v3.0 (GPL-3.0)
+   - Referenced Components:
+     * Extended manager registration and hook abstractions
+     * SELinux dynamic rule hooking via tracepoints/vendor hooks
+
+3. SuiKernel Integration
+   - Integrated, adapted, and maintained by: Kana Wesley Yamada
+   - Tailored specifically for SuiKernel GKI builds and SuiKernel Manager integration.

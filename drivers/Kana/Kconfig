@@ -123,6 +123,9 @@ config YAMADA_KSU_CORE
 	  injection and init.rc property appending) for the Vanilla variant where
 	  the official KernelSU Next is not installed.
 
+	  Credits: Referenced and adapted from KernelSU (weishu) and KernelSU
+	  Next (KernelSU Next Team / rifsxd) under GPL-3.0.
+
 config SUIKERNEL_MANAGER_VERSION_VERIFIER
 	tristate "SuiKernel Manager Version Verifier"
 	default y

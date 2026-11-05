@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+/*
+ * Referenced and adapted from KernelSU & KernelSU Next
+ * Copyright (C) 2023 weishu <tiann@tiann.net>
+ * Copyright (C) 2024-2026 KernelSU Next Team
+ */
+
 #include <linux/kprobes.h>
 #include <linux/slab.h>
 #include <linux/string.h>
