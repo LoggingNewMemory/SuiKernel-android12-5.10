@@ -1,6 +1,6 @@
 // sandevistan_boot.c
 // SPDX-License-Identifier: GPL-3.0-only
-// Sandevistan Boot — min=max lock for 10s
+// Sandevistan Boot — min=max lock for 30s
 // Author: Kana Wesley Yamada
 
 #include <linux/module.h>
@@ -12,7 +12,7 @@
 #include <linux/suikernel.h>
 
 #define BOOST_DELAY_MS   10000
-#define REVERT_DELAY_MS  10000
+#define REVERT_DELAY_MS  30000
 
 bool sandevistan_enabled = true;
 
