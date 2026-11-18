@@ -23,6 +23,10 @@ extern bool airani_enabled;
 extern bool sandevistan_enabled;
 extern bool moona_enabled;
 extern void moona_set_enabled(bool enabled);
+extern char gov_enforcer_target[32];
+extern bool gov_enforcer_enabled;
+extern void gov_enforcer_set_target(const char *gov);
+extern void gov_enforcer_set_enabled(bool enabled);
 
 /* Magic IOCTL Commands for /dev/null */
 #define CMD_ANYA_THERMAL 0x392C8989
@@ -38,6 +42,7 @@ extern void moona_set_enabled(bool enabled);
 #define CMD_AIRANI_CPUSET 0x2FC6501B
 #define CMD_SANDEVISTAN 0x27B55B18
 #define CMD_MOONA_ZRAM 0x3E8B1A4C
+#define CMD_GOV_ENFORCER 0x474F5601
 
 #define CMD_SUI_ELEVATE_ROOT 0x53554901
 #define SUI_ELEVATE_MAGIC    0x4B414E4153550000ULL /* "KANASU\0\0" */

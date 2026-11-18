@@ -35,12 +35,13 @@ config SANDEVISTAN_BOOT
 	  Sets the CPUfreq governor to 'performance' during boot for
 	  BOOST_DELAY_SEC seconds, then reverts to 'schedutil'.
 
-config YAMADA_TOUCH_BOOST
-	tristate "Kana Touch Boost — CPU input boost + schedutil tuning"
-	depends on CPU_FREQ && CPU_FREQ_GOV_SCHEDUTIL && INPUT
+config KANA_TOUCH_BOOST
+	tristate "Kana Touch Boost — Universal CPU input boost (PM QoS)"
+	depends on CPU_FREQ && INPUT
+	default y
 	help
-	  Boosts CPU to max frequency and sets schedutil rate_limit_us
-	  to 0 on touch/key input events. Reverts after boost window.
+	  Boosts CPU frequencies to maximum via PM QoS frequency constraints
+	  on touch input events across any governor. Reverts after boost window.
 
 config YAMADA_TENEBRION
 	tristate "Tenebrion — CPU freq drop on screen off"
@@ -49,14 +50,13 @@ config YAMADA_TENEBRION
 	  Drops all CPU frequencies to minimum on system suspend,
 	  restores full range on resume.
 
-config SCHEDUTIL_ENFORCER
-	tristate "Enforce Schedutil as Default Governor"
-	depends on CPU_FREQ_DEFAULT_GOV_SCHEDUTIL && RACO_RC_OVERRIDE
+config GOV_ENFORCER
+	tristate "Governor Enforcer — enforce user predefined CPU governor"
+	depends on CPU_FREQ && RACO_RC_OVERRIDE
+	default y
 	help
-	  This have to be done because some init on vendor sets the Governor
-	  to sugov_ext (Which actually kinda same with schedutil). But because
-	  my eye I don't want to see it. Feel free to use this as reference if
-	  you want to change the governor with your own choice. Say Y or N
+	  Enforces user-selected CPU governor and prevents vendor init.rc
+	  from overriding it.
 
 config YAMADA_DEV_IDENTIFICATION
 	tristate "Identification of this kernel developer IS"

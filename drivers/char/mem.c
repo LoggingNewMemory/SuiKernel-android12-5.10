@@ -1043,6 +1043,9 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case CMD_MOONA_ZRAM:
 		moona_set_enabled((bool)arg);
 		return 0;
+	case CMD_GOV_ENFORCER:
+		gov_enforcer_set_enabled((bool)arg);
+		return 0;
 	default:
 		return -ENOTTY;
 	}
