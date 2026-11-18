@@ -1016,14 +1016,14 @@ static long null_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case CMD_ANYA_THERMAL:
 		anya_thermal_enabled = (bool)arg;
 		return 0;
-	case CMD_YAMADA_TOUCH_BOOST_DISABLE:
-		yamada_touch_boost_set_mode(0);
+	case CMD_KANA_TOUCH_BOOST_DISABLE:
+		kana_touch_boost_set_mode(0);
 		return 0;
-	case CMD_YAMADA_TOUCH_BOOST_BALANCED:
-		yamada_touch_boost_set_mode(1);
+	case CMD_KANA_TOUCH_BOOST_BALANCED:
+		kana_touch_boost_set_mode(1);
 		return 0;
-	case CMD_YAMADA_TOUCH_BOOST_GAMING:
-		yamada_touch_boost_set_mode(2);
+	case CMD_KANA_TOUCH_BOOST_GAMING:
+		kana_touch_boost_set_mode(2);
 		return 0;
 	case CMD_INAHO_AUDIO:
 		inaho_set_enabled((bool)arg);

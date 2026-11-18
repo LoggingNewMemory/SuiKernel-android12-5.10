@@ -5,6 +5,10 @@
 
 /* Global variables for SuiKernel Manager IOCTL */
 extern bool anya_thermal_enabled;
+extern void kana_touch_boost_off(void);
+extern void kana_touch_boost_set_mode(int mode);
+extern bool kana_touch_boost_enabled;
+extern int  kana_touch_boost_duration;
 extern void yamada_touch_boost_off(void);
 extern void yamada_touch_boost_set_mode(int mode);
 extern bool yamada_touch_boost_enabled;
@@ -22,9 +26,12 @@ extern void moona_set_enabled(bool enabled);
 
 /* Magic IOCTL Commands for /dev/null */
 #define CMD_ANYA_THERMAL 0x392C8989
-#define CMD_YAMADA_TOUCH_BOOST_DISABLE  0x7A1F2C3B
-#define CMD_YAMADA_TOUCH_BOOST_BALANCED 0x5C3E8A1D
-#define CMD_YAMADA_TOUCH_BOOST_GAMING   0x3B9C4E2F
+#define CMD_KANA_TOUCH_BOOST_DISABLE   0x7A1F2C3B
+#define CMD_KANA_TOUCH_BOOST_BALANCED  0x5C3E8A1D
+#define CMD_KANA_TOUCH_BOOST_GAMING    0x3B9C4E2F
+#define CMD_YAMADA_TOUCH_BOOST_DISABLE  CMD_KANA_TOUCH_BOOST_DISABLE
+#define CMD_YAMADA_TOUCH_BOOST_BALANCED CMD_KANA_TOUCH_BOOST_BALANCED
+#define CMD_YAMADA_TOUCH_BOOST_GAMING   CMD_KANA_TOUCH_BOOST_GAMING
 #define CMD_INAHO_AUDIO 0x1281817A
 #define CMD_TENEBRION 0x11EAF5CB
 #define CMD_SPARXIE_SWAP 0x1B3FB033
