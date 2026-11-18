@@ -319,11 +319,6 @@ unsigned long schedutil_cpu_util(int cpu, unsigned long util_cfs,
 }
 EXPORT_SYMBOL_GPL(schedutil_cpu_util);
 
-#ifdef CONFIG_YAMADA_TOUCH_BOOST
-bool yamada_is_boosted = false;
-EXPORT_SYMBOL_GPL(yamada_is_boosted);
-#endif
-
 static void sugov_get_util(struct sugov_cpu *sg_cpu)
 {
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
@@ -332,11 +327,6 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu)
 
 	sg_cpu->max = max;
 	sg_cpu->bw_dl = cpu_bw_dl(rq);
-
-#ifdef CONFIG_YAMADA_TOUCH_BOOST
-	if (unlikely(READ_ONCE(yamada_is_boosted)))
-		util = max;
-#endif
 
 	sg_cpu->util = schedutil_cpu_util(sg_cpu->cpu, util, max,
 					  FREQUENCY_UTIL, NULL);
