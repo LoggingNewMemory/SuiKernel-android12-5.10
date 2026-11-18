@@ -82,4 +82,6 @@ static int __init moona_hoshinova_zram_init(void)
 late_initcall(moona_hoshinova_zram_init);
 
 MODULE_LICENSE("GPL v3");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Enforce zstd as default ZRAM and ZRAM Tweaks");
+

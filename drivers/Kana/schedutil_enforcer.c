@@ -55,4 +55,5 @@ static int __init schedutil_enforcer_init(void)
 late_initcall(schedutil_enforcer_init);
 
 MODULE_LICENSE("GPL v3");
+MODULE_AUTHOR("Kana Wesley Yamada");
 MODULE_DESCRIPTION("Enforce schedutil as default CPU GOV because vendor init.rc overrides it");

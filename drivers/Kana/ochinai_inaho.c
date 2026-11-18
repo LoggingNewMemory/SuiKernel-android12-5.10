@@ -195,4 +195,4 @@ module_exit(inaho_audio_enhance_exit);
 
 MODULE_LICENSE("GPL v3");
 MODULE_AUTHOR("Kana Wesley Yamada");
-MODULE_DESCRIPTION("Ochinai Inaho");
+MODULE_DESCRIPTION("Ochinai Inaho — SCHED_FIFO boost + PM QoS");
